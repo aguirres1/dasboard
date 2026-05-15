@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Covered Calls v5</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #facc15;
+    --border: #475569;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+  }
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 1.2rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  h1 { margin: 0; font-size: 1.4rem; color: var(--accent); }
+  h2 { margin-top: 0; font-size: 1.1rem; color: var(--accent); }
+  .container { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
+  .controls {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  button, .file-label {
+    background: var(--accent);
+    color: #0f172a;
+    border: none;
+    padding: 0.55rem 1.1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  button.secondary, .file-label.secondary {
+    background: var(--panel-2);
+    color: var(--text);
+  }
+  button.danger { background: var(--red); color: #fff; }
+  button:hover, .file-label:hover { opacity: 0.9; }
+  input[type=file] { display: none; }
+  .panel {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .stat {
+    background: var(--panel-2);
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent);
+  }
+  .stat .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat .value { font-size: 1.45rem; font-weight: 700; margin-top: 4px; }
+  .stat.green { border-left-color: var(--green); }
+  .stat.red { border-left-color: var(--red); }
+  .stat.yellow { border-left-color: var(--yellow); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th, td {
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  th {
+    background: var(--panel-2);
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    position: sticky;
+    top: 0;
+  }
+  tr:hover td { background: rgba(56,189,248,0.05); }
+  .badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .badge.itm { background: var(--red); color: #fff; }
+  .badge.atm { background: var(--yellow); color: #0f172a; }
+  .badge.otm { background: var(--green); color: #0f172a; }
+  .badge.expired { background: var(--panel-2); color: var(--muted); }
+  .badge.assigned { background: var(--accent); color: #0f172a; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  details { margin-top: 1rem; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 600; padding: 0.5rem 0; }
+  .empty {
+    text-align: center;
+    padding: 2.5rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .scroll-x { overflow-x: auto; }
+  .price-cell input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 6px;
+    border-radius: 4px;
+    width: 90px;
+    font-size: 0.8rem;
+    text-align: right;
+  }
+  .footer-note { color: var(--muted); font-size: 0.78rem; margin-top: 1.5rem; line-height: 1.6; }
+  .manual-form .form-row { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+  .manual-form label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--muted); flex: 1 1 160px; gap: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .manual-form input, .manual-form select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 0.6rem; font-size: 0.85rem; text-transform: none; letter-spacing: normal; }
+  .manual-form input:focus, .manual-form select:focus { outline: none; border-color: var(--accent); }
+  .manual-form .hint { color: var(--muted); font-size: 0.7rem; margin-top: 2px; text-transform: none; }
+  .manual-form button { padding: 0.5rem 1rem; }
+  .row-manual td:first-child::before { content: '✏ '; color: var(--accent); }
+  .delete-tx { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; cursor: pointer; }
+  .delete-tx:hover { background: var(--red); color: #fff; }
+  .source-badge { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; background: var(--panel-2); color: var(--muted); }
+  .source-badge.manual { background: var(--accent); color: #0f172a; }
+  .acct-select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.7rem; font-size: 0.85rem; font-weight:600; }
+  .acct-select:focus { outline:none; border-color:var(--accent); }
+  .acct-pill { display:inline-block; background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 1px 7px; border-radius: 8px; font-size: 0.7rem; margin-left:6px; }
+
+  /* ---- Expiry alert row ---- */
+  tr.expiry-urgent td { background: rgba(248,113,113,0.08); }
+  tr.expiry-warn td { background: rgba(250,204,21,0.07); }
+  .dte-urgent { color: var(--red); font-weight: 700; }
+  .dte-warn { color: var(--yellow); font-weight: 600; }
+
+  /* ---- Google Sheets sync ---- */
+  .sheets-status { font-size:0.75rem; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; }
+  .sheets-status.connected { background:rgba(74,222,128,0.15); color:var(--green); border:1px solid rgba(74,222,128,0.3); }
+  .sheets-status.disconnected { background:rgba(148,163,184,0.1); color:var(--muted); border:1px solid var(--border); }
+  .sheets-status.syncing { background:rgba(56,189,248,0.15); color:var(--accent); border:1px solid rgba(56,189,248,0.3); }
+  .sheets-status.error { background:rgba(248,113,113,0.15); color:var(--red); border:1px solid rgba(248,113,113,0.3); }
+  button.sheets-btn { background:#16a34a; color:#fff; }
+  button.sheets-btn:hover { opacity:0.9; }
+
+  /* ---- Wheel tracker ---- */
+  .wheel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+  .wheel-card { background: var(--panel-2); border-radius: 10px; padding: 1rem 1.2rem; border: 1px solid var(--border); }
+  .wheel-card h3 { margin: 0 0 0.7rem; font-size: 1rem; display:flex; align-items:center; gap:0.5rem; }
+  .wheel-steps { display: flex; gap: 0; margin-bottom: 0.7rem; }
+  .wheel-step { flex:1; text-align:center; font-size:0.7rem; padding: 5px 2px; border-top: 3px solid var(--border); color: var(--muted); }
+  .wheel-step.active { border-top-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .wheel-step.done { border-top-color: var(--green); color: var(--green); }
+  .wheel-stat-row { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem; }
+  .wheel-stat-item { flex:1; min-width:100px; background: var(--panel); border-radius:6px; padding:0.4rem 0.6rem; }
+  .wheel-stat-item .wlabel { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+  .wheel-stat-item .wval { font-size:0.95rem; font-weight:700; margin-top:2px; }
+
+  /* ---- Simulator ---- */
+  .sim-form { display:flex; gap:0.7rem; flex-wrap:wrap; align-items:flex-end; }
+  .sim-form label { display:flex; flex-direction:column; font-size:0.75rem; color:var(--muted); gap:3px; text-transform:uppercase; letter-spacing:0.04em; flex:1 1 110px; }
+  .sim-form input, .sim-form select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius:6px; padding:0.4rem 0.55rem; font-size:0.85rem; }
+  .sim-form input:focus, .sim-form select:focus { outline:none; border-color:var(--accent); }
+  .sim-results { display:flex; gap:0.8rem; flex-wrap:wrap; margin-top:1rem; }
+  .sim-result-box { flex:1; min-width:130px; background:var(--panel-2); border-radius:8px; padding:0.7rem 1rem; border-left:4px solid var(--accent); }
+  .sim-result-box.green { border-left-color:var(--green); }
+  .sim-result-box.yellow { border-left-color:var(--yellow); }
+  .sim-result-box.red { border-left-color:var(--red); }
+  .sim-result-box .rlabel { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .sim-result-box .rval { font-size:1.2rem; font-weight:700; margin-top:3px; }
+
+  /* ---- Premium chart ---- */
+  #premium-chart-wrap { position:relative; height:160px; margin-top:0.5rem; }
+  .chart-bar-group { display:flex; align-items:flex-end; gap:2px; }
+  canvas#premiumChart { width:100% !important; }
+
+  /* ---- Annualized column highlight ---- */
+  .ann-good { color: var(--green); font-weight:600; }
+  .ann-ok { color: var(--yellow); }
+  .ann-low { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📈 Dashboard Covered Calls</h1>
+    <div class="muted">Tracker local de operaciones Schwab — sin servidor, datos guardados en tu navegador</div>
+  </div>
+  <div class="controls">
+    <select id="account-filter" class="acct-select" title="Filtrar por cuenta">
+      <option value="__ALL__">📊 Todas las cuentas</option>
+    </select>
+    <label class="file-label" for="csv-input">📂 Cargar CSV de Schwab</label>
+    <input type="file" id="csv-input" accept=".csv" multiple>
+    <button class="secondary" id="refresh-prices" title="Actualizar precios de todos los tickers (acciones + opciones)">🔄 Actualizar precios (todos)</button>
+    <button class="secondary" id="refresh-prices-open" title="Actualizar precios sólo de tickers con opciones abiertas">⚡ Actualizar (solo opciones abiertas)</button>
+    <button class="secondary" id="bulk-prices-btn" title="Pegar precios manualmente en bloque">📋 Pegar precios</button>
+    <button class="secondary" id="api-key-btn" title="Configurar API Key gratuita de Twelve Data">🔑 API Key</button>
+    <button class="secondary" id="export-state">💾 Exportar JSON</button>
+    <label class="file-label secondary" for="import-state">📥 Importar JSON</label>
+    <input type="file" id="import-state" accept=".json">
+    <button class="sheets-btn" id="sheets-config-btn" title="Configurar sincronización con Google Sheets">🔗 Google Sheets</button>
+    <button class="secondary" id="sheets-sync-btn" title="Sincronizar ahora con Google Sheets" style="display:none;">☁️ Sincronizar</button>
+    <button class="secondary" id="sheets-force-upload-btn" title="Forzar subida de datos actuales a Sheets" style="display:none;">⬆️ Subir a Sheets</button>
+    <span class="sheets-status disconnected" id="sheets-status">⚪ Sin conectar</span>
+    <button class="danger" id="clear-data">🗑 Limpiar todo</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- KPIs -->
+  <section class="panel">
+    <h2>Resumen General</h2>
+    <div class="grid" id="kpi-grid">
+      <div class="stat green">
+        <div class="label">Primas netas cobradas (total)</div>
+        <div class="value" id="kpi-premium">$0.00</div>
+      </div>
+      <div class="stat" style="min-width:240px;">
+        <div class="label" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+          <span>Primas en rango</span>
+          <select id="premium-range" style="font-size:0.75rem; padding:2px 4px;">
+            <option value="7d">Últimos 7 días</option>
+            <option value="30d">Últimos 30 días</option>
+            <option value="mtd" selected>Mes actual (MTD)</option>
+            <option value="lastmonth">Mes anterior</option>
+            <option value="90d">Últimos 90 días</option>
+            <option value="ytd">Year-to-Date (YTD)</option>
+            <option value="lastyear">Año anterior</option>
+            <option value="365d">Últimos 365 días</option>
+            <option value="all">Todo el histórico</option>
+            <option value="custom">Personalizado…</option>
+          </select>
+        </div>
+        <div class="value" id="kpi-premium-month">$0.00</div>
+        <div class="muted" id="kpi-premium-range-detail" style="font-size:0.7rem; margin-top:2px;">—</div>
+        <div id="premium-range-custom" style="display:none; gap:0.3rem; margin-top:4px;">
+          <input type="date" id="premium-from" style="font-size:0.75rem; padding:2px;">
+          <input type="date" id="premium-to" style="font-size:0.75rem; padding:2px;">
+          <button id="premium-apply" class="secondary" style="font-size:0.7rem; padding:2px 6px;">Aplicar</button>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="label">Posiciones de opción abiertas</div>
+        <div class="value" id="kpi-open-options">0</div>
+      </div>
+      <div class="stat yellow">
+        <div class="label">En riesgo de asignación (ITM)</div>
+        <div class="value" id="kpi-itm">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Tickers con acciones</div>
+        <div class="value" id="kpi-tickers">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Última actualización de precios</div>
+        <div class="value" id="kpi-prices-time" style="font-size:1rem;">—</div>
+        <div class="muted" id="price-status" style="font-size:0.7rem; margin-top:4px;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ingreso manual -->
+  <section class="panel">
+    <details id="manual-details">
+      <summary>➕ Agregar transacción manual (compras anteriores, ajustes, dividendos)</summary>
+      <div style="margin-top:1rem;">
+        <div class="muted" style="margin-bottom:0.8rem;">
+          Usa este formulario para registrar operaciones que no aparezcan en tu CSV de Schwab — por ejemplo, acciones compradas antes del rango exportado, transferencias desde otro bróker o ajustes manuales. Las entradas manuales se mezclan con las del CSV y se guardan en el mismo almacenamiento local.
+        </div>
+        <form id="manual-form" class="manual-form">
+          <div class="form-row">
+            <label>Cuenta
+              <select id="m-account"><option value="Manual">Manual</option></select>
+            </label>
+            <label>Fecha
+              <input type="date" id="m-date" required>
+            </label>
+            <label>Tipo de operación
+              <select id="m-action" required>
+                <option value="Buy">Compra de acciones (Buy)</option>
+                <option value="Sell">Venta de acciones (Sell)</option>
+                <option value="Sell to Open">Vender opción para abrir (Sell to Open)</option>
+                <option value="Buy to Close">Comprar opción para cerrar (Buy to Close)</option>
+                <option value="Buy to Open">Comprar opción para abrir (Buy to Open)</option>
+                <option value="Sell to Close">Vender opción para cerrar (Sell to Close)</option>
+                <option value="Expired">Opción expirada (Expired)</option>
+                <option value="Assigned">Asignación (Assigned)</option>
+                <option value="Cash Dividend">Dividendo en efectivo</option>
+                <option value="Qualified Dividend">Dividendo calificado</option>
+              </select>
+            </label>
+            <label>Ticker subyacente
+              <input type="text" id="m-ticker" placeholder="Ej: AAPL" required style="text-transform:uppercase;">
+            </label>
+          </div>
+          <div class="form-row option-fields" id="option-fields" style="display:none;">
+            <label>Tipo opción
+              <select id="m-opt-type">
+                <option value="C">CALL</option>
+                <option value="P">PUT</option>
+              </select>
+            </label>
+            <label>Strike ($)
+              <input type="number" step="0.01" id="m-strike" placeholder="Ej: 150.00">
+            </label>
+            <label>Vencimiento
+              <input type="date" id="m-expiration">
+            </label>
+          </div>
+          <div class="form-row">
+            <label>Cantidad
+              <input type="number" step="0.0001" id="m-quantity" placeholder="Acciones o # contratos" required>
+            </label>
+            <label>Precio unitario ($)
+              <input type="number" step="0.0001" id="m-price" placeholder="Por acción / por contrato">
+            </label>
+            <label>Comisiones ($)
+              <input type="number" step="0.01" id="m-fees" value="0">
+            </label>
+            <label>Importe neto ($)
+              <input type="number" step="0.01" id="m-amount" placeholder="Auto si está vacío">
+              <span class="hint">Negativo = salida de caja, positivo = entrada</span>
+            </label>
+          </div>
+          <div class="form-row">
+            <label style="flex:2;">Descripción (opcional)
+              <input type="text" id="m-description" placeholder="Ej: Compra inicial transferida desde Fidelity">
+            </label>
+            <button type="submit" style="align-self:flex-end;">✓ Agregar transacción</button>
+            <button type="button" class="secondary" id="m-reset" style="align-self:flex-end;">Limpiar</button>
+          </div>
+        </form>
+      </div>
+    </details>
+  </section>
+
+  <!-- Gráfico de Primas -->
+  <section class="panel">
+    <h2>📊 Primas Cobradas por Período</h2>
+    <div style="display:flex; gap:0.6rem; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap;">
+      <label style="font-size:0.78rem; color:var(--muted); display:flex; align-items:center; gap:0.4rem;">
+        Agrupar por:
+        <select id="chart-group" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.8rem;">
+          <option value="week">Semana</option>
+          <option value="month" selected>Mes</option>
+        </select>
+      </label>
+      <label style="font-size:0.78rem; color:var(--muted); display:flex; align-items:center; gap:0.4rem;">
+        Últimos:
+        <select id="chart-periods" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.8rem;">
+          <option value="6">6</option>
+          <option value="12" selected>12</option>
+          <option value="24">24</option>
+        </select>
+        períodos
+      </label>
+    </div>
+    <div id="premium-chart-wrap"><canvas id="premiumChart"></canvas></div>
+    <div id="chart-empty" class="empty" style="display:none;">Sin datos suficientes para graficar. Carga un CSV para empezar.</div>
+  </section>
+
+  <!-- La Rueda por Ticker -->
+  <section class="panel">
+    <h2>🔄 La Rueda — Estado por Ticker</h2>
+    <div class="muted" style="margin-bottom:0.8rem; font-size:0.8rem;">Visualiza en qué fase de la rueda se encuentra cada activo: venta de put → asignación → covered call → ciclo.</div>
+    <div class="wheel-grid" id="wheel-grid"></div>
+    <div class="empty" id="wheel-empty">Sin posiciones activas en la rueda. Carga un CSV o registra una operación manual.</div>
+  </section>
+
+  <!-- Simulador de operación -->
+  <section class="panel">
+    <details id="sim-details">
+      <summary>🧮 Simulador de Siguiente Operación</summary>
+      <div style="margin-top:1rem;">
+        <div class="muted" style="margin-bottom:0.8rem; font-size:0.8rem;">Calcula la rentabilidad estimada antes de abrir una posición. Útil para comparar strikes y vencimientos rápidamente.</div>
+        <div class="sim-form">
+          <label>Tipo
+            <select id="sim-type">
+              <option value="put">Sell Put (entrada rueda)</option>
+              <option value="call">Sell Call (covered call)</option>
+            </select>
+          </label>
+          <label>Precio acción ($)
+            <input type="number" id="sim-stock" step="0.01" placeholder="Ej: 131.52">
+          </label>
+          <label>Strike ($)
+            <input type="number" id="sim-strike" step="0.01" placeholder="Ej: 129.00">
+          </label>
+          <label>Prima mid ($)
+            <input type="number" id="sim-premium" step="0.01" placeholder="Ej: 2.46">
+          </label>
+          <label>Días al vencimiento
+            <input type="number" id="sim-dte" step="1" placeholder="Ej: 11" min="1">
+          </label>
+          <label>Contratos
+            <input type="number" id="sim-contracts" step="1" value="1" min="1">
+          </label>
+          <button type="button" id="sim-calc" style="align-self:flex-end; padding:0.45rem 1rem;">Calcular</button>
+        </div>
+        <div class="sim-results" id="sim-results" style="display:none;">
+          <div class="sim-result-box green">
+            <div class="rlabel">Prima total cobrada</div>
+            <div class="rval" id="sim-r-total">—</div>
+          </div>
+          <div class="sim-result-box">
+            <div class="rlabel">Rentabilidad período</div>
+            <div class="rval" id="sim-r-period">—</div>
+          </div>
+          <div class="sim-result-box yellow">
+            <div class="rlabel">Rentabilidad anualizada</div>
+            <div class="rval" id="sim-r-annual">—</div>
+          </div>
+          <div class="sim-result-box">
+            <div class="rlabel">Costo base si asignan</div>
+            <div class="rval" id="sim-r-basis">—</div>
+          </div>
+          <div class="sim-result-box">
+            <div class="rlabel">Buffer bajista</div>
+            <div class="rval" id="sim-r-buffer">—</div>
+          </div>
+          <div class="sim-result-box red">
+            <div class="rlabel">Capital en riesgo</div>
+            <div class="rval" id="sim-r-capital">—</div>
+          </div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- Posiciones de opción abiertas -->
+  <section class="panel">
+    <h2>Opciones Abiertas (Cortas)</h2>
+    <div class="scroll-x">
+      <table id="open-options-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Tipo</th>
+            <th>Strike</th>
+            <th>Vencimiento</th>
+            <th>DTE</th>
+            <th>Contratos</th>
+            <th>Prima neta</th>
+            <th>Precio actual</th>
+            <th>Distancia %</th>
+            <th>Rto. Anualizado</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="open-options-empty">Aún no hay opciones abiertas. Carga un CSV de Schwab para empezar.</div>
+  </section>
+
+  <!-- Resumen por ticker -->
+  <section class="panel">
+    <h2>Resumen por Activo (Costo Real de Adquisición)</h2>
+    <div class="muted" style="margin-bottom:0.6rem; display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+        <input type="checkbox" id="positions-show-all">
+        <span>Mostrar todas las posiciones (incluir acciones sin opciones operadas)</span>
+      </label>
+    </div>
+    <div class="scroll-x">
+      <table id="positions-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Acciones</th>
+            <th>Costo Bruto</th>
+            <th>Costo Promedio</th>
+            <th>Primas Netas</th>
+            <th>Dividendos</th>
+            <th>Costo Real Ajustado</th>
+            <th>Costo Real /acción</th>
+            <th>Precio Actual</th>
+            <th>P&amp;L No Realizada</th>
+            <th>P&amp;L Realizada</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="positions-empty">Sin posiciones registradas todavía.</div>
+  </section>
+
+  <!-- Historial -->
+  <section class="panel">
+    <details>
+      <summary>📋 Ver historial completo de transacciones</summary>
+      <div class="scroll-x" style="margin-top:1rem;">
+        <table id="history-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Origen</th>
+              <th>Acción</th>
+              <th>Símbolo</th>
+              <th>Descripción</th>
+              <th>Cantidad</th>
+              <th>Precio</th>
+              <th>Comisión</th>
+              <th>Importe</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <div class="footer-note">
+    <strong>Cómo se calcula el costo real de adquisición:</strong> Para cada ticker, sumamos el costo de las acciones compradas (incluidas las que ingresaron por asignación de puts), restamos las primas netas cobradas (calls + puts), restamos los dividendos recibidos y sumamos las comisiones. El resultado se divide por las acciones actualmente en cartera para obtener el costo real por acción. Una opción se marca <span class="badge itm">ITM</span> cuando una call corta tiene strike por debajo del precio actual o una put corta tiene strike por encima, indicando alto riesgo de asignación.
+    <br><br>
+    <strong>Privacidad:</strong> Todos los datos se almacenan únicamente en el <code>localStorage</code> de tu navegador. Si borras los datos de navegación, los perderás; usa "Exportar JSON" para hacer copia de seguridad. La actualización de precios se hace contra Stooq.com (proveedor público gratuito); si fallara, puedes editar el precio manualmente haciendo click en la columna "Precio Actual".
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Dashboard Covered Calls — Single-file local app
+   ============================================================ */
+
+const STORAGE_KEY = 'cc_dashboard_v1';
+const PRICES_KEY  = 'cc_dashboard_prices_v1';
+const PRICES_TIME_KEY = 'cc_dashboard_prices_time_v1';
+
+// ----- State -----
+let state = {
+  transactions: [],   // raw rows
+  prices: {},         // ticker -> price
+  pricesTime: null,
+};
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state.transactions = JSON.parse(raw);
+    const p = localStorage.getItem(PRICES_KEY);
+    if (p) state.prices = JSON.parse(p);
+    state.pricesTime = localStorage.getItem(PRICES_TIME_KEY);
+  } catch(e) { console.error(e); }
+}
+
+function saveState(syncToSheets = true) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.transactions));
+  localStorage.setItem(PRICES_KEY,  JSON.stringify(state.prices));
+  if (state.pricesTime) localStorage.setItem(PRICES_TIME_KEY, state.pricesTime);
+  if (syncToSheets) scheduleSheetsSync();
+}
+
+// ----- Helpers -----
+const OPTION_RE = /^([A-Z]{1,5})\s+(\d{2}\/\d{2}\/\d{4})\s+([\d.]+)\s+([CP])$/;
+
+function parseSchwabAmount(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  const s = String(v).replace(/[$,\s]/g,'').replace(/[()]/g,'-');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function normalizeDate(v) {
+  if (!v) return null;
+  const s = String(v);
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // ISO with time: 2026-05-06T00:00:31.000Z
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0,10);
+  // MM/DD/YYYY
+  const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[1]}-${m[2]}`;
+  return null;
+}
+
+function parseDate(v) {
+  return normalizeDate(v);
+}
+
+function fmtMoney(n, sign=false) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const s = (sign && n>0 ? '+' : '') + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  return n < 0 ? '-' + s.replace('$', '$') : s;
+}
+
+function classifyOption(symbol) {
+  const m = symbol.match(OPTION_RE);
+  if (!m) return null;
+  return {
+    underlying: m[1],
+    expiration: `${m[2].slice(6,10)}-${m[2].slice(0,2)}-${m[2].slice(3,5)}`,
+    strike: parseFloat(m[3]),
+    type: m[4]   // C or P
+  };
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr+'T16:00:00');
+  return Math.ceil((d - new Date()) / 86400000);
+}
+
+// ----- CSV Parsing -----
+function handleFiles(files) {
+  Array.from(files).forEach(async file => {
+    Papa.parse(file, {
+      header: false,
+      skipEmptyLines: true,
+      complete: async (res) => {
+        await ingestRows(res.data, file.name);
+        recompute();
+      }
+    });
+  });
+}
+
+// Try to detect Schwab account label from the first lines of the CSV.
+// Schwab CSVs typically start with: "Transactions for account ...XXXX as of ..."
+function detectAccountFromRows(rows, filename) {
+  for (let i=0;i<Math.min(rows.length,5);i++) {
+    const cell = String((rows[i]||[])[0]||'');
+    const m = cell.match(/account[^A-Za-z0-9]*([A-Za-z0-9.\-_*]+)/i);
+    if (m) return m[1].replace(/^\.+/,'').replace(/[*]+/g,'') || 'Schwab';
+  }
+  // fallback to filename without extension
+  return filename.replace(/\.csv$/i,'').replace(/[_-]+/g,' ').slice(0,30) || 'Schwab';
+}
+
+async function ingestRows(rows, filename) {
+  // find header row (first row that contains "Date" and "Action")
+  let headerIdx = -1;
+  for (let i=0;i<Math.min(rows.length,10);i++) {
+    const r = rows[i].map(x=>String(x).trim().toLowerCase());
+    if (r.includes('date') && r.includes('action') && r.includes('symbol')) {
+      headerIdx = i; break;
+    }
+  }
+  if (headerIdx === -1) {
+    alert(`No se encontró el header esperado en ${filename}. Asegúrate de exportar desde Schwab > History > Export CSV.`);
+    return;
+  }
+  // Detect / ask account name — show modal with existing accounts
+  const detected = detectAccountFromRows(rows, filename);
+  
+  // Get existing accounts from transactions
+  const existingAccounts = [...new Set(state.transactions.map(t => t.account).filter(Boolean))];
+  
+  const accountName = await new Promise(resolve => {
+    // Build modal
+    let modal = document.getElementById('account-select-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'account-select-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:460px;">
+        <h3 style="margin:0 0 0.5rem;color:var(--accent);">📂 Importar CSV</h3>
+        <div style="font-size:0.82rem;color:var(--muted);margin-bottom:1rem;">Archivo: <strong style="color:var(--text);">${filename}</strong></div>
+        <label style="font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:0.4rem;">Cuenta destino</label>
+        ${existingAccounts.length > 0 ? `
+        <div style="margin-bottom:0.7rem;">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.4rem;">Cuentas existentes:</div>
+          <div style="display:flex;flex-direction:column;gap:0.3rem;">
+            ${existingAccounts.map(acc => `
+              <button onclick="document.getElementById('account-name-input').value='${acc}'" 
+                style="text-align:left;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0.4rem 0.7rem;cursor:pointer;font-size:0.82rem;">
+                ${acc}
+              </button>`).join('')}
+          </div>
+        </div>` : ''}
+        <input id="account-name-input" type="text" value="${detected}" 
+          style="width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--accent);border-radius:6px;padding:0.5rem 0.7rem;font-size:0.9rem;box-sizing:border-box;margin-bottom:1rem;"
+          placeholder="Nombre de la cuenta">
+        <div style="display:flex;gap:0.7rem;justify-content:flex-end;">
+          <button onclick="document.getElementById('account-select-modal').style.display='none'; window._accountResolve('${detected}');"
+            style="background:var(--panel-2);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:0.45rem 1rem;cursor:pointer;">
+            Cancelar
+          </button>
+          <button onclick="const v=document.getElementById('account-name-input').value.trim(); document.getElementById('account-select-modal').style.display='none'; window._accountResolve(v||'${detected}');"
+            style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.45rem 1.2rem;cursor:pointer;font-weight:600;">
+            Importar →
+          </button>
+        </div>
+      </div>`;
+    modal.style.display = 'flex';
+    window._accountResolve = resolve;
+    // Also allow Enter key
+    setTimeout(() => {
+      const inp = document.getElementById('account-name-input');
+      if (inp) {
+        inp.focus();
+        inp.select();
+        inp.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            const v = inp.value.trim();
+            modal.style.display = 'none';
+            resolve(v || detected);
+          }
+        };
+      }
+    }, 100);
+  });
+  const headers = rows[headerIdx].map(x=>String(x).trim());
+  const idx = {};
+  headers.forEach((h,i)=>{ idx[h.toLowerCase()] = i; });
+
+  const ix = (key, alts=[]) => {
+    if (idx[key] !== undefined) return idx[key];
+    for (const a of alts) if (idx[a] !== undefined) return idx[a];
+    return -1;
+  };
+
+  const cDate = ix('date');
+  const cAction = ix('action');
+  const cSymbol = ix('symbol');
+  const cDesc = ix('description');
+  const cQty = ix('quantity');
+  const cPrice = ix('price');
+  const cFees = ix('fees & comm', ['fees','fee','commission','fees and comm']);
+  const cAmount = ix('amount');
+
+  let added = 0;
+  for (let i = headerIdx+1; i<rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[cDate]) continue;
+    const dateStr = parseDate(r[cDate]);
+    if (!dateStr) continue;          // skip totals / non-data lines
+    const action = String(r[cAction]||'').trim();
+    if (!action) continue;
+    const symbol = String(r[cSymbol]||'').trim();
+    const tx = {
+      id: 'tx_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36),
+      date: dateStr,
+      account: accountName,
+      action: action,
+      symbol: symbol,
+      description: String(r[cDesc]||''),
+      quantity: parseSchwabAmount(r[cQty]),
+      price: parseSchwabAmount(r[cPrice]),
+      fees: parseSchwabAmount(r[cFees]),
+      amount: parseSchwabAmount(r[cAmount]),
+      source: 'csv',
+      _src: filename
+    };
+    // de-duplicate (same account/date/action/symbol/qty/amount)
+    const dupKey = `${tx.account}|${tx.date}|${tx.action}|${tx.symbol}|${tx.quantity}|${tx.amount}`;
+    if (!state.transactions.some(t=>`${t.account||''}|${t.date}|${t.action}|${t.symbol}|${t.quantity}|${t.amount}`===dupKey)) {
+      state.transactions.push(tx);
+      added++;
+    }
+  }
+  state.transactions.sort((a,b)=> a.date.localeCompare(b.date));
+  saveState();
+  alert(`Importadas ${added} transacciones nuevas de ${filename}.`);
+}
+
+// ----- Account helpers -----
+function getAccounts() {
+  const set = new Set();
+  for (const tx of state.transactions) set.add(tx.account || 'Sin cuenta');
+  return Array.from(set).sort();
+}
+function getCurrentAccount() {
+  const sel = document.getElementById('account-filter');
+  return sel ? sel.value : '__ALL__';
+}
+function filteredTransactions() {
+  const acct = getCurrentAccount();
+  if (acct === '__ALL__') return state.transactions;
+  return state.transactions.filter(t => (t.account||'Sin cuenta') === acct);
+}
+function refreshAccountSelector() {
+  const sel = document.getElementById('account-filter');
+  if (!sel) return;
+  const current = sel.value || '__ALL__';
+  const accts = getAccounts();
+  sel.innerHTML = '<option value="__ALL__">📊 Todas las cuentas (' + accts.length + ')</option>' +
+    accts.map(a => `<option value="${a.replace(/"/g,'&quot;')}">${a}</option>`).join('');
+  // restore selection if still valid
+  if (current === '__ALL__' || accts.includes(current)) sel.value = current;
+  // Also update manual form account dropdown
+  const m = document.getElementById('m-account');
+  if (m) {
+    const cur = m.value || 'Manual';
+    const opts = ['Manual', ...accts.filter(a=>a!=='Manual')];
+    m.innerHTML = opts.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">${a}</option>`).join('') +
+      '<option value="__NEW__">+ Nueva cuenta...</option>';
+    if (opts.includes(cur)) m.value = cur;
+  }
+}
+
+// ----- Aggregation -----
+function aggregate() {
+  const tickers = {};   // underlying -> {shares, costGross, premium, dividends, fees, realized, openOptions[], hasOptionHistory}
+  const ensure = (t) => {
+    if (!tickers[t]) tickers[t] = {
+      ticker:t, shares:0, costGross:0, premium:0, dividends:0, fees:0,
+      realizedPL:0, openOptions:[], hasOptionHistory:false
+    };
+    return tickers[t];
+  };
+
+  const txs = filteredTransactions();
+  for (const tx of txs) {
+    const opt = classifyOption(tx.symbol);
+    const action = tx.action.toLowerCase();
+    const amount = tx.amount;
+
+    if (opt) {
+      const t = ensure(opt.underlying);
+      t.hasOptionHistory = true;
+      const contracts = Math.abs(tx.quantity);
+      if (action === 'sell to open') {
+        // premium received (amount positive)
+        t.premium += amount;
+        t.openOptions.push({
+          id: `${tx.date}-${tx.symbol}-${contracts}`,
+          date: tx.date,
+          type: opt.type,
+          strike: opt.strike,
+          expiration: opt.expiration,
+          contracts: contracts,
+          premiumNet: amount,
+        });
+      } else if (action === 'buy to close') {
+        // premium paid (amount negative); reduce premium
+        t.premium += amount;
+        // remove matching open contracts (FIFO)
+        let toClose = contracts;
+        for (const lot of t.openOptions) {
+          if (toClose<=0) break;
+          if (lot.type===opt.type && lot.strike===opt.strike && lot.expiration===opt.expiration) {
+            const take = Math.min(lot.contracts, toClose);
+            lot.contracts -= take;
+            toClose -= take;
+          }
+        }
+        t.openOptions = t.openOptions.filter(l=>l.contracts>0);
+      } else if (action === 'expired') {
+        // remove matching open contracts (no cash)
+        let toExpire = contracts || 1;
+        for (const lot of t.openOptions) {
+          if (toExpire<=0) break;
+          if (lot.type===opt.type && lot.strike===opt.strike && lot.expiration===opt.expiration) {
+            const take = Math.min(lot.contracts, toExpire);
+            lot.contracts -= take;
+            toExpire -= take;
+          }
+        }
+        t.openOptions = t.openOptions.filter(l=>l.contracts>0);
+      } else if (action === 'assigned') {
+        // Schwab always generates TWO events for an assignment:
+        //   CALL assigned → "Assigned" + "Sell" (same date)
+        //   PUT  assigned → "Assigned" + "Buy"  (same date)
+        // The actual share change is handled by the Buy/Sell transaction.
+        // Here we ONLY record P&L and close the open option — no share changes.
+        let toAssign = contracts || 1;
+        for (const lot of t.openOptions) {
+          if (toAssign<=0) break;
+          if (lot.type===opt.type && lot.strike===opt.strike && lot.expiration===opt.expiration) {
+            const take = Math.min(lot.contracts, toAssign);
+            lot.contracts -= take;
+            toAssign -= take;
+          }
+        }
+        t.openOptions = t.openOptions.filter(l=>l.contracts>0);
+        const sharesAffected = (contracts || 1) * 100;
+        if (opt.type==='C') {
+          // Record realized P&L for the call assignment
+          if (t.shares > 0) {
+            const avgCost = t.costGross / t.shares;
+            const sold = Math.min(sharesAffected, t.shares);
+            t.realizedPL += sold * (opt.strike - avgCost);
+          }
+          // Flag so the paired Sell transaction skips P&L recalculation (already done above)
+          t._pendingAssignedSell = (t._pendingAssignedSell || 0) + sharesAffected;
+        } else if (opt.type==='P') {
+          // Flag so the paired Buy transaction is recognized as an assignment buy
+          t._pendingAssignedBuy = (t._pendingAssignedBuy || 0) + sharesAffected;
+        }
+      }
+      t.fees += tx.fees;
+    } else {
+      // Stock-level transactions
+      const sym = (tx.symbol||'').trim();
+      if (!sym) continue;
+      const t = ensure(sym);
+      if (action==='buy' || action==='reinvest shares') {
+        const qty = Math.abs(tx.quantity);
+        // Check if this Buy is the paired transaction from a PUT assignment
+        // If so, use the strike price (already recorded via _pendingAssignedBuy)
+        // and don't double-add costGross since assignment already set it
+        const pendingBuy = t._pendingAssignedBuy || 0;
+        if (action==='buy' && pendingBuy >= qty) {
+          // This is the Schwab "Buy" paired with a PUT Assigned
+          // Process normally — shares and cost ARE needed, just don't double-count
+          t._pendingAssignedBuy -= qty;
+          t.shares    += qty;
+          t.costGross += Math.abs(amount);
+        } else {
+          t.shares    += qty;
+          t.costGross += Math.abs(amount);
+        }
+      } else if (action==='sell') {
+        const qty = Math.abs(tx.quantity);
+        const pendingSell = t._pendingAssignedSell || 0;
+        if (pendingSell >= qty) {
+          // This is the Schwab "Sell" paired with a CALL Assigned — handle share reduction only
+          t._pendingAssignedSell -= qty;
+          if (t.shares > 0) {
+            const avgCost = t.costGross / t.shares;
+            const sold = Math.min(qty, t.shares);
+            t.costGross -= sold * avgCost;
+            t.shares    -= sold;
+          }
+        } else {
+          // Regular sell
+          if (t.shares > 0) {
+            const avgCost = t.costGross / t.shares;
+            const sold = Math.min(qty, t.shares);
+            t.realizedPL += sold * ((Math.abs(amount)/qty) - avgCost);
+            t.costGross  -= sold * avgCost;
+            t.shares     -= sold;
+          }
+        }
+      } else if (
+        action==='cash dividend' || action==='qualified dividend' ||
+        action==='special dividend' || action==='reinvest dividend' ||
+        action==='non-qualified dividend' || action==='prior year cash dividend' ||
+        action==='qual div reinvest'
+      ) {
+        t.dividends += amount;
+      }
+      t.fees += tx.fees;
+    }
+  }
+
+  // ---- AUTO-EXPIRY: remove any open option whose expiration date has already passed.
+  // Schwab sometimes omits the "Expired" event for worthless options.
+  // We consider an option expired if its expiration date < today (after market close = next calendar day).
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const ghostOptions = []; // track auto-closed ones for display
+  for (const t of Object.values(tickers)) {
+    const expired = t.openOptions.filter(lot => lot.expiration < todayStr);
+    if (expired.length) {
+      expired.forEach(lot => ghostOptions.push({ ...lot, ticker: t.ticker }));
+    }
+    t.openOptions = t.openOptions.filter(lot => lot.expiration >= todayStr);
+  }
+  // Store ghosts for renderOpenOptions warning
+  aggregate._lastGhosts = ghostOptions;
+
+  return tickers;
+}
+
+// ----- Rendering -----
+function recompute() {
+  refreshAccountSelector();
+  const tickers = aggregate();
+  renderKPIs(tickers);
+  renderOpenOptions(tickers);
+  renderPositions(tickers);
+  renderHistory();
+  renderWheel(tickers);
+  renderPremiumChart();
+}
+
+// ----- Wheel Tracker + Detail Modal -----
+function renderWheel(tickers) {
+  const grid = document.getElementById('wheel-grid');
+  const empty = document.getElementById('wheel-empty');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const arr = Object.values(tickers).filter(t => t.hasOptionHistory || t.openOptions.length > 0);
+  empty.style.display = arr.length ? 'none' : 'block';
+
+  for (const t of arr) {
+    const px = state.prices[t.ticker];
+    const openPuts  = t.openOptions.filter(o => o.type === 'P');
+    const openCalls = t.openOptions.filter(o => o.type === 'C');
+    // Ignore fractional shares < 1 from dividend reinvestment for phase detection
+    const hasShares = t.shares >= 1;
+    const displayShares = hasShares ? Math.round(t.shares) : 0;
+
+    let phase = 'idle';
+    if (openPuts.length > 0 && !hasShares) phase = 'sell-put';
+    else if (hasShares && openCalls.length > 0) phase = 'covered-call';
+    else if (hasShares && openCalls.length === 0) phase = 'assigned';
+
+    const steps = [
+      { key: 'sell-put',      label: '1. Sell Put' },
+      { key: 'assigned',      label: '2. Asignación' },
+      { key: 'covered-call',  label: '3. Covered Call' },
+      { key: 'idle',          label: '✓ Ciclo completo' },
+    ];
+
+    const totalPremium  = t.premium;
+    const avgCost       = hasShares ? t.costGross / t.shares : null;
+    const realCost      = hasShares ? (t.costGross - t.premium - t.dividends) / t.shares : null;
+    const unrealized    = px && hasShares ? (px - (realCost ?? avgCost ?? 0)) * displayShares : null;
+
+    let nextAction = '';
+    if (phase === 'sell-put')      nextAction = `Put $${openPuts[0].strike} vence en ${daysUntil(openPuts[0].expiration)}d`;
+    else if (phase === 'assigned') nextAction = `Vender covered call sobre ${displayShares} acciones`;
+    else if (phase === 'covered-call') nextAction = `Call $${openCalls[0].strike} vence en ${daysUntil(openCalls[0].expiration)}d`;
+    else nextAction = 'Abrir nuevo sell put para reiniciar';
+
+    const card = document.createElement('div');
+    card.className = 'wheel-card';
+    card.style.cursor = 'pointer';
+    card.title = 'Clic para ver detalle de operaciones';
+    card.dataset.ticker = t.ticker;
+
+    card.innerHTML = `
+      <h3>
+        <span style="font-size:1.1rem;">🎡</span>
+        <strong>${t.ticker}</strong>
+        ${px ? `<span style="color:var(--muted);font-size:0.8rem;font-weight:400;">$${px.toFixed(2)}</span>` : ''}
+        <span style="margin-left:auto;font-size:0.7rem;color:var(--muted);font-weight:400;">Ver detalle →</span>
+      </h3>
+      <div class="wheel-steps">
+        ${steps.map(s => {
+          const phaseIdx = steps.findIndex(x => x.key === phase);
+          const sIdx     = steps.findIndex(x => x.key === s.key);
+          const cls = phase === s.key ? 'active' : (t.hasOptionHistory && phaseIdx > sIdx ? 'done' : '');
+          return `<div class="wheel-step ${cls}">${s.label}</div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.5rem;">▶ ${nextAction}</div>
+      <div class="wheel-stat-row">
+        <div class="wheel-stat-item" data-field="shares">
+          <div class="wlabel">Acciones</div>
+          <div class="wval">${hasShares ? displayShares : '—'}</div>
+        </div>
+        <div class="wheel-stat-item" data-field="premium">
+          <div class="wlabel">Primas cobradas</div>
+          <div class="wval pos">${fmtMoney(totalPremium)}</div>
+        </div>
+        ${realCost !== null ? `<div class="wheel-stat-item" data-field="realcost">
+          <div class="wlabel">Costo real/acc</div>
+          <div class="wval ${realCost<0?'neg':''}">${fmtMoney(realCost)}</div>
+        </div>` : ''}
+        ${unrealized !== null ? `<div class="wheel-stat-item" data-field="unrealized">
+          <div class="wlabel">P&L no realizada</div>
+          <div class="wval ${unrealized>=0?'pos':'neg'}">${fmtMoney(unrealized)}</div>
+        </div>` : ''}
+      </div>
+    `;
+
+    card.addEventListener('click', (e) => {
+      const field = e.target.closest('[data-field]')?.dataset.field || null;
+      showWheelDetail(t, field);
+    });
+
+    grid.appendChild(card);
+  }
+}
+
+function showWheelDetail(t, highlightField) {
+  // Gather all transactions for this ticker
+  const txs = filteredTransactions().filter(tx => {
+    const opt = classifyOption(tx.symbol);
+    if (opt) return opt.underlying === t.ticker;
+    return (tx.symbol || '').trim() === t.ticker;
+  });
+
+  const px = state.prices[t.ticker];
+  const hasShares = t.shares > 0;
+  const avgCost  = hasShares ? t.costGross / t.shares : null;
+  const realCost = hasShares ? (t.costGross - t.premium - t.dividends) / t.shares : null;
+  const unrealized = px && hasShares ? (px - (realCost ?? avgCost ?? 0)) * t.shares : null;
+
+  // Group by category for the summary breakdown
+  const groups = {
+    'Compras de acciones':  txs.filter(tx => { const a=tx.action.toLowerCase(); return a==='buy'||a==='reinvest shares'; }),
+    'Ventas de acciones':   txs.filter(tx => tx.action.toLowerCase()==='sell'),
+    'Sell to Open':         txs.filter(tx => tx.action.toLowerCase()==='sell to open'),
+    'Buy to Close':         txs.filter(tx => tx.action.toLowerCase()==='buy to close'),
+    'Opciones expiradas':   txs.filter(tx => tx.action.toLowerCase()==='expired'),
+    'Asignaciones':         txs.filter(tx => tx.action.toLowerCase()==='assigned'),
+    'Dividendos':           txs.filter(tx => /dividend/i.test(tx.action)),
+  };
+
+  // Which groups to highlight based on the field clicked
+  const highlightMap = {
+    shares:     ['Compras de acciones','Ventas de acciones','Asignaciones'],
+    premium:    ['Sell to Open','Buy to Close','Opciones expiradas'],
+    realcost:   ['Compras de acciones','Sell to Open','Buy to Close','Dividendos','Asignaciones'],
+    unrealized: ['Compras de acciones','Asignaciones'],
+  };
+  const highlighted = highlightField ? (highlightMap[highlightField] || []) : [];
+
+  // Build modal HTML
+  let sectionsHTML = '';
+  for (const [label, rows] of Object.entries(groups)) {
+    if (!rows.length) continue;
+    const total = rows.reduce((s, tx) => s + (tx.amount || 0), 0);
+    const isHL  = highlighted.includes(label);
+    sectionsHTML += `
+      <div style="margin-bottom:1rem;${isHL?'border-left:3px solid var(--accent);padding-left:0.8rem;':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+          <span style="font-size:0.78rem;font-weight:700;color:${isHL?'var(--accent)':'var(--muted)'};text-transform:uppercase;letter-spacing:0.05em;">${label} ${isHL?'← explica este valor':''}</span>
+          <span style="font-weight:700;color:${total>=0?'var(--green)':'var(--red)'};">${fmtMoney(total)}</span>
+        </div>
+        <table style="width:100%;font-size:0.78rem;border-collapse:collapse;">
+          <thead>
+            <tr style="color:var(--muted);">
+              <th style="text-align:left;padding:3px 6px;border-bottom:1px solid var(--border);">Fecha</th>
+              <th style="text-align:left;padding:3px 6px;border-bottom:1px solid var(--border);">Símbolo</th>
+              <th style="text-align:right;padding:3px 6px;border-bottom:1px solid var(--border);">Qty</th>
+              <th style="text-align:right;padding:3px 6px;border-bottom:1px solid var(--border);">Precio</th>
+              <th style="text-align:right;padding:3px 6px;border-bottom:1px solid var(--border);">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(tx => `<tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+              <td style="padding:4px 6px;">${tx.date}</td>
+              <td style="padding:4px 6px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${tx.symbol}">${tx.symbol}</td>
+              <td style="text-align:right;padding:4px 6px;">${tx.quantity||''}</td>
+              <td style="text-align:right;padding:4px 6px;">${tx.price?'$'+tx.price.toFixed(2):''}</td>
+              <td style="text-align:right;padding:4px 6px;color:${(tx.amount||0)>=0?'var(--green)':'var(--red)'};">${fmtMoney(tx.amount)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  const summaryRows = [
+    { label: 'Costo bruto acciones',   val: t.costGross,               note: '' },
+    { label: '− Primas netas cobradas',val: -t.premium,                note: '' },
+    { label: '− Dividendos',           val: -t.dividends,              note: '' },
+    { label: '= Costo real ajustado',  val: t.costGross - t.premium - t.dividends, note: '', bold: true },
+    { label: 'Acciones en cartera',    val: null, txt: t.shares > 0 ? t.shares.toFixed(0) : '0', note: '' },
+    { label: 'Costo real / acción',    val: null, txt: realCost !== null ? fmtMoney(realCost) : '—', note: '', bold: true },
+    { label: 'Precio actual',          val: null, txt: px ? '$'+px.toFixed(2) : '—', note: '' },
+    { label: 'P&L no realizada',       val: unrealized, note: '', bold: true },
+  ];
+
+  const summaryHTML = summaryRows.map(r => {
+    const display = r.val !== undefined && r.val !== null
+      ? `<span style="color:${r.val>=0?'var(--green)':'var(--red)'};">${fmtMoney(r.val)}</span>`
+      : `<span>${r.txt || '—'}</span>`;
+    return `<tr>
+      <td style="padding:4px 8px;color:var(--muted);font-size:0.8rem;${r.bold?'font-weight:700;color:var(--text);':''}">${r.label}</td>
+      <td style="text-align:right;padding:4px 8px;font-size:0.8rem;${r.bold?'font-weight:700;':''}">${display}</td>
+    </tr>`;
+  }).join('');
+
+  // Create / reuse modal
+  let modal = document.getElementById('wheel-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'wheel-modal';
+    modal.style.cssText = `
+      position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);
+      display:flex;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;
+    `;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;width:100%;max-width:720px;padding:1.5rem;position:relative;">
+      <button onclick="document.getElementById('wheel-modal').style.display='none'"
+        style="position:absolute;top:1rem;right:1rem;background:var(--panel-2);border:none;color:var(--text);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:1rem;line-height:1;">✕</button>
+      <h2 style="margin:0 0 0.3rem;color:var(--accent);">🎡 ${t.ticker} — Detalle de la Rueda</h2>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1.2rem;">
+        ${highlightField ? `Hiciste clic en <strong style="color:var(--accent);">${highlightField==='shares'?'Acciones':highlightField==='premium'?'Primas cobradas':highlightField==='realcost'?'Costo real/acc':'P&L no realizada'}</strong> — las transacciones que explican ese valor están resaltadas abajo.` : 'Todas las transacciones que componen los valores de esta posición.'}
+      </div>
+
+      <!-- Resumen numérico -->
+      <div style="background:var(--panel-2);border-radius:8px;padding:0.8rem 1rem;margin-bottom:1.2rem;">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Cómo se calculan los valores</div>
+        <table style="width:100%;border-collapse:collapse;">${summaryHTML}</table>
+      </div>
+
+      <!-- Detalle por categoría -->
+      <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.7rem;">Transacciones por categoría</div>
+      ${sectionsHTML || '<div style="color:var(--muted);font-style:italic;">Sin transacciones registradas.</div>'}
+    </div>
+  `;
+  modal.style.display = 'flex';
+}
+
+
+// ----- Premium Chart -----
+let __chartInstance = null;
+function renderPremiumChart() {
+  const canvas = document.getElementById('premiumChart');
+  const emptyEl = document.getElementById('chart-empty');
+  if (!canvas) return;
+  const groupBy = (document.getElementById('chart-group') || {}).value || 'month';
+  const periodsN = parseInt((document.getElementById('chart-periods') || {}).value || '12');
+
+  const txs = filteredTransactions();
+  const buckets = {};
+  for (const tx of txs) {
+    const opt = classifyOption(tx.symbol);
+    if (!opt) continue;
+    const a = tx.action.toLowerCase();
+    if (a !== 'sell to open' && a !== 'buy to close') continue;
+    const dateNorm = normalizeDate(tx.date);
+    if (!dateNorm) continue;
+    const d = new Date(dateNorm + 'T12:00:00');
+    if (isNaN(d.getTime())) continue;
+    let key;
+    if (groupBy === 'week') {
+      const startOfYear = new Date(d.getFullYear(), 0, 1);
+      const week = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+      key = `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
+    } else {
+      key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+    buckets[key] = (buckets[key] || 0) + tx.amount;
+  }
+
+  const sortedKeys = Object.keys(buckets).sort().slice(-periodsN);
+  if (sortedKeys.length === 0) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const labels = sortedKeys.map(k => {
+    if (k.includes('W')) return k;
+    const [y, m] = k.split('-');
+    return new Date(+y, +m-1, 1).toLocaleDateString('es', {month:'short', year:'2-digit'});
+  });
+  const data = sortedKeys.map(k => +(buckets[k] || 0).toFixed(2));
+  const colors = data.map(v => v >= 0 ? 'rgba(74,222,128,0.75)' : 'rgba(248,113,113,0.75)');
+
+  if (__chartInstance) { __chartInstance.destroy(); __chartInstance = null; }
+  __chartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Primas netas ($)',
+        data,
+        backgroundColor: colors,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' $' + ctx.raw.toFixed(2)
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: '#334155' } },
+        y: { ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => '$'+v }, grid: { color: '#334155' } }
+      }
+    }
+  });
+}
+
+// ----- Simulator -----
+function setupSimulator() {
+  const btn = document.getElementById('sim-calc');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const type = document.getElementById('sim-type').value;
+    const stock = parseFloat(document.getElementById('sim-stock').value);
+    const strike = parseFloat(document.getElementById('sim-strike').value);
+    const premium = parseFloat(document.getElementById('sim-premium').value);
+    const dte = parseInt(document.getElementById('sim-dte').value);
+    const contracts = parseInt(document.getElementById('sim-contracts').value) || 1;
+
+    if (isNaN(stock) || isNaN(strike) || isNaN(premium) || isNaN(dte) || dte < 1) {
+      alert('Completa todos los campos para calcular.'); return;
+    }
+    const capital = strike * 100 * contracts;
+    const totalPremium = premium * 100 * contracts;
+    const periodReturn = totalPremium / capital * 100;
+    const annReturn = periodReturn / dte * 365;
+    const basis = strike - premium;
+    const buffer = (stock - basis) / stock * 100;
+
+    document.getElementById('sim-r-total').textContent = '$' + totalPremium.toFixed(2);
+    document.getElementById('sim-r-period').textContent = periodReturn.toFixed(2) + '%';
+    document.getElementById('sim-r-annual').textContent = annReturn.toFixed(1) + '%';
+    document.getElementById('sim-r-basis').textContent = '$' + basis.toFixed(2) + '/acc';
+    document.getElementById('sim-r-buffer').textContent = buffer.toFixed(2) + '%';
+    document.getElementById('sim-r-capital').textContent = '$' + capital.toLocaleString('en-US');
+    document.getElementById('sim-results').style.display = 'flex';
+  });
+}
+
+
+// Compute [from,to] inclusive YYYY-MM-DD strings for the selected preset.
+function getPremiumRange() {
+  const sel = document.getElementById('premium-range');
+  const preset = sel ? sel.value : 'mtd';
+  const today = new Date();
+  const ymd = (d) => d.toISOString().slice(0,10);
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfPrevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+  const startOfPrevMonth = new Date(today.getFullYear(), today.getMonth()-1, 1);
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const endOfPrevYear = new Date(today.getFullYear()-1, 11, 31);
+  const startOfPrevYear = new Date(today.getFullYear()-1, 0, 1);
+  const minus = (days) => { const d=new Date(today); d.setDate(d.getDate()-days+1); return d; };
+  let from, to, label;
+  switch (preset) {
+    case '7d':        from = minus(7);             to = today; label='Ult. 7d'; break;
+    case '30d':       from = minus(30);            to = today; label='Ult. 30d'; break;
+    case 'mtd':       from = startOfMonth;         to = today; label='Mes actual'; break;
+    case 'lastmonth': from = startOfPrevMonth;     to = endOfPrevMonth; label='Mes anterior'; break;
+    case '90d':       from = minus(90);            to = today; label='Ult. 90d'; break;
+    case 'ytd':       from = startOfYear;          to = today; label='YTD'; break;
+    case 'lastyear':  from = startOfPrevYear;      to = endOfPrevYear; label='Año anterior'; break;
+    case '365d':      from = minus(365);           to = today; label='Ult. 365d'; break;
+    case 'all':       from = new Date(2000,0,1);   to = today; label='Todo'; break;
+    case 'custom': {
+      const f = document.getElementById('premium-from').value;
+      const t = document.getElementById('premium-to').value;
+      from = f ? new Date(f+'T00:00:00') : new Date(2000,0,1);
+      to   = t ? new Date(t+'T00:00:00') : today;
+      label = `${f||'inicio'} → ${t||'hoy'}`;
+      break;
+    }
+    default: from = startOfMonth; to = today; label = 'Mes actual';
+  }
+  return { from: ymd(from), to: ymd(to), label };
+}
+
+function renderKPIs(tickers) {
+  const arr = Object.values(tickers);
+  let totalPremium = 0;
+  let rangePremium = 0;
+  let rangeContracts = 0;
+  let openCount = 0;
+  let itmCount = 0;
+  let tickersWithShares = 0;
+
+  const range = getPremiumRange();
+  for (const tx of filteredTransactions()) {
+    const opt = classifyOption(tx.symbol);
+    if (!opt) continue;
+    const a = tx.action.toLowerCase();
+    if (a==='sell to open' || a==='buy to close') {
+      totalPremium += tx.amount;
+      if (tx.date >= range.from && tx.date <= range.to) {
+        rangePremium += tx.amount;
+        rangeContracts += Math.abs(tx.quantity || 0);
+      }
+    }
+  }
+  for (const t of arr) {
+    openCount += t.openOptions.length;
+    if (t.shares>0) tickersWithShares++;
+    const px = state.prices[t.ticker];
+    if (px) {
+      for (const lot of t.openOptions) {
+        if (lot.type==='C' && px > lot.strike) itmCount++;
+        if (lot.type==='P' && px < lot.strike) itmCount++;
+      }
+    }
+  }
+  document.getElementById('kpi-premium').textContent = fmtMoney(totalPremium);
+  document.getElementById('kpi-premium-month').textContent = fmtMoney(rangePremium);
+  const detail = document.getElementById('kpi-premium-range-detail');
+  if (detail) detail.textContent = `${range.label} • ${range.from} a ${range.to} • ${rangeContracts} contratos`;
+  document.getElementById('kpi-open-options').textContent = openCount;
+  document.getElementById('kpi-itm').textContent = itmCount;
+  document.getElementById('kpi-tickers').textContent = tickersWithShares;
+  const rawTime = state.pricesTime;
+  let prettyTime = '—';
+  if (rawTime) {
+    const d = new Date(rawTime);
+    prettyTime = isNaN(d) ? rawTime : d.toLocaleString('es-CO', {dateStyle:'short', timeStyle:'short'});
+  }
+  document.getElementById('kpi-prices-time').textContent = prettyTime;
+}
+
+function renderOpenOptions(tickers) {
+  const tbody = document.querySelector('#open-options-table tbody');
+  tbody.innerHTML = '';
+  let rows = [];
+  for (const t of Object.values(tickers)) {
+    for (const lot of t.openOptions) rows.push({...lot, ticker:t.ticker});
+  }
+  rows.sort((a,b)=>a.expiration.localeCompare(b.expiration));
+  document.getElementById('open-options-empty').style.display = rows.length ? 'none' : 'block';
+  for (const lot of rows) {
+    const px = state.prices[lot.ticker];
+    let status = 'OTM', cls='otm';
+    if (px) {
+      if (lot.type==='C') {
+        if (px > lot.strike) { status='ITM'; cls='itm'; }
+        else if (Math.abs(px-lot.strike)/lot.strike<0.01) { status='ATM'; cls='atm'; }
+      } else {
+        if (px < lot.strike) { status='ITM'; cls='itm'; }
+        else if (Math.abs(px-lot.strike)/lot.strike<0.01) { status='ATM'; cls='atm'; }
+      }
+    }
+    const dist = px ? ((lot.strike - px)/px*100) : null;
+    const dte = daysUntil(lot.expiration);
+    const tr = document.createElement('tr');
+    // Expiry alert row styling
+    if (dte !== null && dte <= 1) tr.classList.add('expiry-urgent');
+    else if (dte !== null && dte <= 3) tr.classList.add('expiry-warn');
+    // Annualized return: (premium / (strike * 100)) / dte * 365
+    // Annualized return: use total duration (open date → expiration), not remaining DTE
+    let annStr = '—', annCls = '';
+    const premiumNet = parseFloat(lot.premiumNet) || 0;
+    const strike = parseFloat(lot.strike) || 0;
+    if (premiumNet > 0 && strike > 0) {
+      const capital = strike * lot.contracts * 100;
+      // Normalize open date — could be string YYYY-MM-DD or Date object
+      const rawDate = lot.date || lot.openDate || null;
+      let totalDays = (dte !== null && dte > 0) ? dte : 1; // fallback
+      if (rawDate) {
+        const openStr = typeof rawDate === 'string'
+          ? rawDate.slice(0,10)
+          : new Date(rawDate).toISOString().slice(0,10);
+        const openDate = new Date(openStr + 'T12:00:00');
+        const expDate  = new Date(lot.expiration + 'T12:00:00');
+        if (!isNaN(openDate) && !isNaN(expDate)) {
+          totalDays = Math.max(1, Math.round((expDate - openDate) / 86400000));
+        }
+      }
+      const ann = (premiumNet / capital) / totalDays * 365 * 100;
+      annStr = ann.toFixed(1) + '%';
+      annCls = ann >= 40 ? 'ann-good' : ann >= 20 ? 'ann-ok' : 'ann-low';
+    }
+    const dteStr = dte !== null
+      ? `<span class="${dte<=1?'dte-urgent':dte<=3?'dte-warn':''}">${dte}d${dte<=1?' ⚠️':dte<=3?' ⏰':''}</span>`
+      : '—';
+    tr.innerHTML = `
+      <td><strong>${lot.ticker}</strong></td>
+      <td>${lot.type==='C' ? 'CALL' : 'PUT'} corta</td>
+      <td>$${lot.strike.toFixed(2)}</td>
+      <td>${lot.expiration}</td>
+      <td>${dteStr}</td>
+      <td>${lot.contracts}</td>
+      <td class="${lot.premiumNet>=0?'pos':'neg'}">${fmtMoney(lot.premiumNet)}</td>
+      <td class="price-cell">${px ? '$'+px.toFixed(2) : '<input data-ticker="'+lot.ticker+'" placeholder="precio">'}</td>
+      <td>${dist!==null ? (dist>=0?'+':'')+dist.toFixed(2)+'%' : '—'}</td>
+      <td class="${annCls}">${annStr}</td>
+      <td><span class="badge ${cls}">${status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  // wire manual price inputs
+  tbody.querySelectorAll('input[data-ticker]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) {
+        state.prices[inp.dataset.ticker] = v;
+        state.pricesTime = new Date().toLocaleString();
+        saveState(); recompute();
+      }
+    });
+  });
+}
+
+function renderPositions(tickers) {
+  const tbody = document.querySelector('#positions-table tbody');
+  tbody.innerHTML = '';
+  const showAll = document.getElementById('positions-show-all') && document.getElementById('positions-show-all').checked;
+  let arr = Object.values(tickers);
+  if (!showAll) {
+    // Default: only tickers that have actually had options activity (opened, closed, expired, assigned)
+    arr = arr.filter(t => t.hasOptionHistory || t.openOptions.length > 0);
+  } else {
+    // Show-all mode: any ticker with shares, realized P&L, premium or dividends
+    arr = arr.filter(t => t.shares>0 || t.realizedPL!==0 || t.premium!==0 || t.dividends!==0);
+  }
+  arr.sort((a,b)=> a.ticker.localeCompare(b.ticker));
+  const empty = document.getElementById('positions-empty');
+  if (empty) {
+    empty.style.display = arr.length ? 'none' : 'block';
+    empty.textContent = arr.length ? '' :
+      (showAll ? 'Sin posiciones registradas todavía.'
+               : 'Aún no has operado opciones sobre ningún activo. Marca “Mostrar todas las posiciones” si quieres ver también las acciones sin opciones.');
+  }
+  for (const t of arr) {
+    const avgCost = t.shares>0 ? t.costGross/t.shares : 0;
+    const adjustedCost = t.costGross - t.premium - t.dividends;  // net invested after premiums & dividends
+    const adjustedPerShare = t.shares>0 ? adjustedCost/t.shares : null;
+    const px = state.prices[t.ticker];
+    const unrealized = px && t.shares>0 ? (px - (adjustedPerShare||avgCost))*t.shares : null;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${t.ticker}</strong></td>
+      <td>${t.shares.toFixed(0)}</td>
+      <td>${fmtMoney(t.costGross)}</td>
+      <td>${avgCost ? fmtMoney(avgCost) : '—'}</td>
+      <td class="${t.premium>=0?'pos':'neg'}">${fmtMoney(t.premium)}</td>
+      <td class="${t.dividends>=0?'pos':'neg'}">${fmtMoney(t.dividends)}</td>
+      <td>${fmtMoney(adjustedCost)}</td>
+      <td>${adjustedPerShare ? fmtMoney(adjustedPerShare) : '—'}</td>
+      <td>${px ? '$'+px.toFixed(2) : '<span class="muted">—</span>'}</td>
+      <td class="${unrealized>=0?'pos':'neg'}">${unrealized!==null ? fmtMoney(unrealized) : '—'}</td>
+      <td class="${t.realizedPL>=0?'pos':'neg'}">${fmtMoney(t.realizedPL)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderHistory() {
+  const tbody = document.querySelector('#history-table tbody');
+  tbody.innerHTML = '';
+  const recent = filteredTransactions().slice().reverse().slice(0, 500);
+  for (const tx of recent) {
+    const tr = document.createElement('tr');
+    if (tx.source==='manual') tr.classList.add('row-manual');
+    const sourceBadge = tx.source==='manual'
+      ? '<span class="source-badge manual">manual</span>'
+      : '<span class="source-badge">CSV</span>';
+    const acct = tx.account || '—';
+    tr.innerHTML = `
+      <td>${tx.date}</td>
+      <td>${sourceBadge}<span class="acct-pill">${acct}</span></td>
+      <td>${tx.action}</td>
+      <td>${tx.symbol||''}</td>
+      <td style="text-align:left; max-width:280px; white-space:normal;">${tx.description||''}</td>
+      <td>${tx.quantity||''}</td>
+      <td>${tx.price ? '$'+tx.price.toFixed(2) : ''}</td>
+      <td>${tx.fees ? fmtMoney(tx.fees) : ''}</td>
+      <td class="${tx.amount>=0?'pos':'neg'}">${fmtMoney(tx.amount)}</td>
+      <td><button class="delete-tx" data-id="${tx.id||''}" title="Eliminar">✖</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('.delete-tx').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      if (!id) { alert('Esta transacción es antigua y no tiene ID. Recarga el CSV para regenerar IDs.'); return; }
+      if (!confirm('¿Eliminar esta transacción?')) return;
+      state.transactions = state.transactions.filter(t => t.id !== id);
+      saveState(); recompute();
+    });
+  });
+}
+
+// ----- Price Refresh (cascade of providers, all CORS-friendly) -----
+function collectTickers() {
+  const tickers = new Set();
+  for (const tx of state.transactions) {
+    const opt = classifyOption(tx.symbol);
+    if (opt) tickers.add(opt.underlying);
+    else if (tx.symbol && /^[A-Z]{1,5}$/.test(tx.symbol.trim())) tickers.add(tx.symbol.trim());
+  }
+  return Array.from(tickers);
+}
+
+// Only tickers that currently have at least one open short option position.
+// Reuses aggregate() so it respects the current account filter as well.
+function collectOpenOptionTickers() {
+  const tickers = new Set();
+  const agg = aggregate();
+  for (const t of Object.values(agg)) {
+    if (t.openOptions && t.openOptions.length > 0) tickers.add(t.ticker);
+  }
+  return Array.from(tickers);
+}
+
+// Hard timeout helper for any fetch (kills hanging requests)
+async function fetchWithTimeout(url, ms, externalSignal) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), ms);
+  if (externalSignal) externalSignal.addEventListener('abort', ()=>ctrl.abort(), { once:true });
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Provider 1: Twelve Data BATCH (one HTTP call for many symbols).
+async function fetchTwelveDataBatch(tickers, apiKey, externalSignal) {
+  const symbols = tickers.join(',');
+  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(symbols)}&apikey=${encodeURIComponent(apiKey)}`;
+  const resp = await fetchWithTimeout(url, 10000, externalSignal);
+  if (!resp.ok) throw new Error('twelvedata http '+resp.status);
+  const j = await resp.json();
+  const out = {};
+  if (j.code && j.code !== 200) throw new Error('twelvedata: ' + (j.message || ('code '+j.code)));
+  if (tickers.length === 1) {
+    if (j.status === 'error') throw new Error(j.message || 'twelvedata error');
+    const p = parseFloat(j.price);
+    if (!isNaN(p) && p>0) out[tickers[0]] = p;
+  } else {
+    for (const tk of tickers) {
+      const entry = j[tk];
+      if (!entry) continue;
+      if (entry.code && entry.code !== 200) continue;
+      const p = parseFloat(entry.price);
+      if (!isNaN(p) && p>0) out[tk] = p;
+    }
+  }
+  return out;
+}
+
+async function fetchStooqViaProxy(ticker, externalSignal) {
+  const target = encodeURIComponent(`https://stooq.com/q/l/?s=${ticker.toLowerCase()}.us&i=d&f=sd2t2ohlcv&h&e=csv`);
+  const url = `https://api.cors.lol/?url=${target}`;
+  const resp = await fetchWithTimeout(url, 8000, externalSignal);
+  if (!resp.ok) throw new Error('cors.lol http '+resp.status);
+  const text = (await resp.text()).trim();
+  if (/rate limit/i.test(text) || /forbidden/i.test(text) || text.length < 20) {
+    throw new Error('cors.lol rate-limited or empty');
+  }
+  const lines = text.split(/\r?\n/);
+  if (lines.length < 2) throw new Error('cors.lol empty body');
+  const headers = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const values  = lines[1].split(',');
+  const idx = headers.indexOf('close');
+  if (idx === -1) throw new Error('cors.lol no close col');
+  const close = parseFloat(values[idx]);
+  if (isNaN(close) || close<=0) throw new Error('cors.lol bad price');
+  return close;
+}
+
+async function fetchStooqViaAllOrigins(ticker, externalSignal) {
+  const target = encodeURIComponent(`https://stooq.com/q/l/?s=${ticker.toLowerCase()}.us&i=d&f=sd2t2ohlcv&h&e=csv`);
+  const url = `https://api.allorigins.win/raw?url=${target}`;
+  const resp = await fetchWithTimeout(url, 8000, externalSignal);
+  if (!resp.ok) throw new Error('allorigins http '+resp.status);
+  const text = (await resp.text()).trim();
+  if (/timeout|rate limit/i.test(text) || text.length < 20) throw new Error('allorigins empty/timeout');
+  const lines = text.split(/\r?\n/);
+  if (lines.length < 2) throw new Error('allorigins empty body');
+  const headers = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const values  = lines[1].split(',');
+  const idx = headers.indexOf('close');
+  if (idx === -1) throw new Error('allorigins no close col');
+  const close = parseFloat(values[idx]);
+  if (isNaN(close) || close<=0) throw new Error('allorigins bad price');
+  return close;
+}
+
+async function fetchPriceCascade(ticker, apiKey, externalSignal) {
+  const errors = [];
+  if (apiKey) {
+    try {
+      const out = await fetchTwelveDataBatch([ticker], apiKey, externalSignal);
+      if (out[ticker]) return { price: out[ticker], source: 'TwelveData' };
+      throw new Error('twelvedata: no price');
+    } catch(e){ errors.push('TD:'+e.message); }
+  }
+  try { return { price: await fetchStooqViaProxy(ticker, externalSignal), source: 'Stooq/cors.lol' }; }
+  catch(e){ errors.push('CL:'+e.message); }
+  try { return { price: await fetchStooqViaAllOrigins(ticker, externalSignal), source: 'Stooq/allorigins' }; }
+  catch(e){ errors.push('AO:'+e.message); }
+  throw new Error(errors.join(' | '));
+}
+
+// Shared cancel controller so a second click on the button aborts the run.
+let __refreshAbort = null;
+
+async function refreshPrices(opts) {
+  opts = opts || {};
+  const tickers = opts.tickers || collectTickers();
+  const buttonId = opts.buttonId || 'refresh-prices';
+  const buttonLabel = opts.buttonLabel || '🔄 Actualizar precios';
+  const scopeLabel = opts.scopeLabel || 'todas las posiciones';
+  const btn = document.getElementById(buttonId);
+  const status = document.getElementById('price-status');
+
+  // Second click during a running refresh -> cancel.
+  if (__refreshAbort) {
+    __refreshAbort.abort();
+    __refreshAbort = null;
+    if (status) status.textContent = 'Cancelado por el usuario.';
+    if (btn) { btn.textContent = buttonLabel; btn.disabled = false; }
+    return;
+  }
+
+  if (!tickers.length) {
+    alert(opts.emptyMessage || 'No hay tickers detectados aún. Carga un CSV o ingresa transacciones manuales.');
+    return;
+  }
+  const apiKey = (state.apiKey || localStorage.getItem('cc_twelvedata_key') || '').trim();
+  __refreshAbort = new AbortController();
+  const externalSignal = __refreshAbort.signal;
+  if (btn) { btn.textContent = '⏹ Cancelar actualización'; btn.disabled = false; }
+  if (status) status.textContent = `Iniciando (${tickers.length} tickers)…`;
+
+  let okCount = 0, failCount = 0;
+  const failed = [];
+  const sources = {};
+  let pendingTickers = tickers.slice();
+
+  // FAST PATH: with API key, do ONE batch call to Twelve Data (much faster, no rate-limit issues).
+  if (apiKey) {
+    if (status) status.textContent = `Consultando Twelve Data en lote (${pendingTickers.length} tickers)…`;
+    try {
+      const out = await fetchTwelveDataBatch(pendingTickers, apiKey, externalSignal);
+      for (const [tk, px] of Object.entries(out)) {
+        state.prices[tk] = px;
+        okCount++;
+        sources['TwelveData'] = (sources['TwelveData']||0)+1;
+      }
+      pendingTickers = pendingTickers.filter(tk => !(tk in out));
+      if (status) status.textContent = `Twelve Data: ${okCount} ok. Pendientes: ${pendingTickers.length}.`;
+    } catch(e) {
+      console.warn('twelvedata batch failed', e.message);
+      if (status) status.textContent = `Twelve Data falló (${e.message}). Cayendo a Stooq…`;
+    }
+  }
+
+  // SLOW PATH: tickers que no obtuvo TD se intentan vía Stooq con timeouts duros y delay.
+  for (let i=0; i<pendingTickers.length; i++) {
+    if (externalSignal.aborted) break;
+    const tk = pendingTickers[i];
+    if (status) status.textContent = `Consultando ${tk} (${i+1}/${pendingTickers.length}) vía Stooq…`;
+    try {
+      const { price, source } = await fetchPriceCascade(tk, '', externalSignal);
+      state.prices[tk] = price;
+      sources[source] = (sources[source]||0)+1;
+      okCount++;
+    } catch(e) {
+      failCount++;
+      failed.push(tk);
+      console.warn('price fail', tk, e.message);
+    }
+    await new Promise(r=>setTimeout(r, 700));
+  }
+
+  const wasAborted = externalSignal.aborted;
+  __refreshAbort = null;
+  state.pricesTime = new Date().toLocaleString();
+  saveState();
+  recompute();
+  if (btn) { btn.textContent = buttonLabel; btn.disabled = false; }
+  const sourcesStr = Object.entries(sources).map(([k,v])=>`${v} ${k}`).join(', ') || 'ninguna';
+  if (status) {
+    status.textContent = wasAborted
+      ? `Cancelado. ${okCount} ok / ${failCount} fallidos antes de detener.`
+      : `Última actualización (${scopeLabel}): ${okCount} ok / ${failCount} fallidos. Fuentes: ${sourcesStr}.`;
+  }
+  if (failCount > 0 && !wasAborted) {
+    alert(`Precios actualizados: ${okCount} ok, ${failCount} fallidos.\n` +
+          `Fallaron: ${failed.join(', ')}\n\n` +
+          `Sugerencias:\n` +
+          ` 1) Si aún no la has configurado, agrega una API key gratuita de Twelve Data (botón "🔑 API Key").\n` +
+          ` 2) Pega los precios manualmente con el botón "📋 Pegar precios".\n` +
+          ` 3) Edita un precio individualmente desde la tabla de Opciones Abiertas.`);
+  }
+}
+
+function openApiKeyDialog() {
+  const current = state.apiKey || localStorage.getItem('cc_twelvedata_key') || '';
+  const v = prompt(
+    '🔑 API Key de Twelve Data (gratis - 800 calls/día)\n\n' +
+    'Regístrate gratis en https://twelvedata.com/register para obtener tu key. ' +
+    'Es opcional: el dashboard también usa Stooq vía proxy CORS público como fallback. ' +
+    'Pega tu key abajo (deja vacío para borrarla):',
+    current);
+  if (v === null) return;
+  state.apiKey = v.trim();
+  localStorage.setItem('cc_twelvedata_key', state.apiKey);
+  alert(state.apiKey ? 'API Key guardada localmente.' : 'API Key borrada.');
+}
+
+function openBulkPriceDialog() {
+  const tickers = collectTickers();
+  const example = tickers.slice(0,4).map(t=>`${t},${(state.prices[t]||100).toFixed(2)}`).join('\n') || 'AAPL,280.14\nMSFT,414.44';
+  const input = prompt(
+    '📋 Pegar precios manualmente\n\n' +
+    'Pega un precio por línea con formato "TICKER,PRECIO" (la coma puede ser espacio o tabulación).\n' +
+    'Tip: puedes copiar y pegar directamente desde la web de Schwab, Yahoo Finance o Google Sheets.\n\n' +
+    'Ejemplo:\n' + example,
+    '');
+  if (!input) return;
+  const lines = input.split(/\r?\n/);
+  let updated = 0;
+  for (const line of lines) {
+    const parts = line.split(/[\s,;\t]+/).filter(Boolean);
+    if (parts.length < 2) continue;
+    const tk = parts[0].toUpperCase().replace(/[^A-Z]/g,'');
+    const px = parseFloat(parts[1].replace(/[^\d.\-]/g,''));
+    if (tk && !isNaN(px) && px>0) {
+      state.prices[tk] = px;
+      updated++;
+    }
+  }
+  state.pricesTime = new Date().toLocaleString();
+  saveState();
+  recompute();
+  alert(`Precios actualizados manualmente: ${updated} tickers.`);
+}
+
+// ----- Wiring -----
+document.getElementById('csv-input').addEventListener('change', e => {
+  if (e.target.files.length) handleFiles(e.target.files);
+  e.target.value = '';
+});
+document.getElementById('positions-show-all').addEventListener('change', recompute);
+// Premium range selector wiring
+(function wirePremiumRange(){
+  const sel = document.getElementById('premium-range');
+  const customBox = document.getElementById('premium-range-custom');
+  const fromInp = document.getElementById('premium-from');
+  const toInp = document.getElementById('premium-to');
+  const applyBtn = document.getElementById('premium-apply');
+  const today = new Date().toISOString().slice(0,10);
+  const monthAgo = (() => { const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,10); })();
+  if (fromInp && !fromInp.value) fromInp.value = monthAgo;
+  if (toInp && !toInp.value) toInp.value = today;
+  sel.addEventListener('change', () => {
+    customBox.style.display = sel.value === 'custom' ? 'flex' : 'none';
+    if (sel.value !== 'custom') recompute();
+  });
+  applyBtn.addEventListener('click', recompute);
+})();
+document.getElementById('refresh-prices').addEventListener('click', () => refreshPrices({
+  buttonId: 'refresh-prices',
+  buttonLabel: '🔄 Actualizar precios (todos)',
+  scopeLabel: 'todos los tickers'
+}));
+document.getElementById('refresh-prices-open').addEventListener('click', () => refreshPrices({
+  tickers: collectOpenOptionTickers(),
+  buttonId: 'refresh-prices-open',
+  buttonLabel: '⚡ Actualizar (solo opciones abiertas)',
+  scopeLabel: 'opciones abiertas',
+  emptyMessage: 'No hay opciones abiertas en este momento (recuerda que se respeta el filtro de cuenta seleccionado).'
+}));
+document.getElementById('bulk-prices-btn').addEventListener('click', openBulkPriceDialog);
+document.getElementById('api-key-btn').addEventListener('click', openApiKeyDialog);
+document.getElementById('clear-data').addEventListener('click', ()=>{
+  if (confirm('¿Borrar todos los datos almacenados? Considera exportar el JSON antes.')) {
+    state = { transactions:[], prices:{}, pricesTime:null };
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PRICES_KEY);
+    localStorage.removeItem(PRICES_TIME_KEY);
+    recompute();
+  }
+});
+document.getElementById('export-state').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cc-dashboard-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+});
+document.getElementById('import-state').addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.transactions) {
+        state = data;
+        saveState(false); // save locally only — don't auto-sync to Sheets
+        recompute();
+        const sheetsMsg = getSheetsUrl() ? '\n\nPresiona "⬆️ Subir a Sheets" para actualizar Google Sheets con estos datos.' : '';
+        alert(`✅ Datos importados correctamente (${state.transactions.length} transacciones).${sheetsMsg}`);
+        updateSheetButtons();
+      }
+    } catch (err) { alert('Archivo JSON inválido.'); }
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+});
+
+// ----- Manual transaction form -----
+function setupManualForm() {
+  const form = document.getElementById('manual-form');
+  const actionSel = document.getElementById('m-action');
+  const optFields = document.getElementById('option-fields');
+  const acctSel = document.getElementById('m-account');
+  const dateInput = document.getElementById('m-date');
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
+
+  const isOptionAction = (a) => /open|close|expired|assigned/i.test(a);
+  const updateOptionVisibility = () => {
+    optFields.style.display = isOptionAction(actionSel.value) ? 'flex' : 'none';
+  };
+  actionSel.addEventListener('change', updateOptionVisibility);
+  updateOptionVisibility();
+
+  acctSel.addEventListener('change', () => {
+    if (acctSel.value === '__NEW__') {
+      const name = prompt('Nombre de la nueva cuenta (ej: "Schwab Brokerage", "Schwab IRA"):','');
+      if (name && name.trim()) {
+        const opt = document.createElement('option');
+        opt.value = name.trim(); opt.textContent = name.trim();
+        acctSel.insertBefore(opt, acctSel.querySelector('option[value="__NEW__"]'));
+        acctSel.value = name.trim();
+      } else {
+        acctSel.value = 'Manual';
+      }
+    }
+  });
+
+  document.getElementById('m-reset').addEventListener('click', () => form.reset());
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const account = acctSel.value === '__NEW__' ? 'Manual' : acctSel.value;
+    const date = document.getElementById('m-date').value;
+    const action = actionSel.value;
+    const ticker = document.getElementById('m-ticker').value.trim().toUpperCase();
+    const quantity = parseFloat(document.getElementById('m-quantity').value) || 0;
+    const price = parseFloat(document.getElementById('m-price').value) || 0;
+    const fees = parseFloat(document.getElementById('m-fees').value) || 0;
+    let amount = document.getElementById('m-amount').value;
+    const description = document.getElementById('m-description').value || '';
+
+    if (!date || !action || !ticker || !quantity) {
+      alert('Faltan campos obligatorios: fecha, tipo, ticker y cantidad.');
+      return;
+    }
+
+    let symbol = ticker;
+    if (isOptionAction(action)) {
+      const optType = document.getElementById('m-opt-type').value;
+      const strike = parseFloat(document.getElementById('m-strike').value);
+      const exp = document.getElementById('m-expiration').value;
+      if (!strike || !exp) { alert('Para opciones debes ingresar strike y vencimiento.'); return; }
+      const [yyyy,mm,dd] = exp.split('-');
+      symbol = `${ticker} ${mm}/${dd}/${yyyy} ${strike.toFixed(2)} ${optType}`;
+    }
+
+    if (amount === '' || isNaN(parseFloat(amount))) {
+      // auto-compute amount
+      if (isOptionAction(action)) {
+        // contract * price * 100 (premium)
+        const gross = quantity * price * 100;
+        if (/sell to open|sell to close/i.test(action)) amount = gross - fees;
+        else if (/buy to open|buy to close/i.test(action)) amount = -(gross + fees);
+        else amount = 0;
+      } else if (/^buy/i.test(action)) {
+        amount = -(quantity*price + fees);
+      } else if (/^sell/i.test(action)) {
+        amount = quantity*price - fees;
+      } else if (/dividend/i.test(action)) {
+        amount = price || 0;  // user can put dividend total in price field if simpler
+      } else {
+        amount = 0;
+      }
+    } else {
+      amount = parseFloat(amount);
+    }
+
+    const tx = {
+      id: 'mtx_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36),
+      date: date,
+      account: account || 'Manual',
+      action: action,
+      symbol: symbol,
+      description: description || '(ingreso manual)',
+      quantity: quantity,
+      price: price,
+      fees: fees,
+      amount: amount,
+      source: 'manual'
+    };
+    state.transactions.push(tx);
+    state.transactions.sort((a,b)=>a.date.localeCompare(b.date));
+    saveState();
+    recompute();
+    form.reset();
+    if (dateInput) dateInput.value = new Date().toISOString().slice(0,10);
+    updateOptionVisibility();
+    alert(`Transacción agregada: ${action} ${ticker} (${account}).`);
+  });
+}
+
+// ----- Google Sheets Sync + Perfiles -----
+const SHEETS_URL_KEY  = 'cc_sheets_url_v1';
+const SHEETS_PROFILE_KEY = 'cc_sheets_profile_v1';
+const PROFILES = {
+  DISA:   { label: 'DISA',   locked: false },
+  Andres: { label: 'Andrés', locked: true  }, // locked = solo puede ver/escribir su propio perfil
+};
+
+function getSheetsUrl()   { return localStorage.getItem(SHEETS_URL_KEY) || ''; }
+function setSheetsUrl(url){ localStorage.setItem(SHEETS_URL_KEY, url); }
+function getProfile()     { return localStorage.getItem(SHEETS_PROFILE_KEY) || ''; }
+function setProfile(p)    { localStorage.setItem(SHEETS_PROFILE_KEY, p); }
+
+function isLocked() {
+  const p = getProfile();
+  return p && PROFILES[p] && PROFILES[p].locked;
+}
+
+function updateSheetsStatus(status, msg) {
+  const el = document.getElementById('sheets-status');
+  if (!el) return;
+  el.className = 'sheets-status ' + status;
+  const profile = getProfile();
+  const profileBadge = profile ? ` · ${PROFILES[profile]?.label || profile}` : '';
+  el.textContent = {
+    connected:    '🟢 ' + (msg || 'Conectado') + profileBadge,
+    disconnected: '⚪ Sin conectar',
+    syncing:      '🔄 ' + (msg || 'Sincronizando…'),
+    error:        '🔴 ' + (msg || 'Error'),
+  }[status] || msg;
+  updateSheetButtons();
+}
+
+async function sheetsFetch(body) {
+  const url = getSheetsUrl();
+  if (!url) throw new Error('No hay URL configurada');
+  const resp = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  const text = await resp.text();
+  try { return JSON.parse(text); }
+  catch(e) { throw new Error('Respuesta inválida del servidor: ' + text.slice(0,100)); }
+}
+
+async function sheetsLoad() {
+  const url = getSheetsUrl();
+  const profile = getProfile();
+  if (!url || !profile) return;
+  updateSheetsStatus('syncing', 'Cargando…');
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const dataResp = await fetch(`${url}${sep}action=read&profile=${encodeURIComponent(profile)}`);
+    const data = await dataResp.json();
+    if (data.error) throw new Error(data.error);
+
+    if (data.transactions && data.transactions.length > 0) {
+      state.transactions = data.transactions.map(tx => ({
+        ...tx,
+        date: normalizeDate(tx.date) || tx.date
+      }));
+    }
+    if (data.prices) state.prices = data.prices;
+    if (data.pricesTime) state.pricesTime = data.pricesTime;
+
+    saveState(false);
+    recompute();
+    updateSheetsStatus('connected', `🟢 ${profile} — ${state.transactions.length} txs`);
+  } catch(err) {
+    updateSheetsStatus('error', err.message);
+  }
+}
+
+async function sheetsSave() {
+  const url = getSheetsUrl();
+  const profile = getProfile();
+  if (!url || !profile) return;
+  updateSheetsStatus('syncing', 'Guardando…');
+  try {
+    const result = await sheetsFetch({
+      action: 'write',
+      profile: profile,
+      transactions: state.transactions,
+      prices: state.prices,
+      pricesTime: state.pricesTime,
+    });
+    if (result.error) throw new Error(result.error);
+    updateSheetsStatus('connected', `Guardado — ${new Date().toLocaleTimeString()}`);
+  } catch(err) {
+    updateSheetsStatus('error', err.message);
+  }
+}
+
+function openSheetsConfig() {
+  const currentUrl = getSheetsUrl();
+  const currentProfile = getProfile();
+
+  const input = prompt(
+    '🔗 Google Sheets — Configurar\n\n' +
+    'Formato: PERFIL|URL\n\n' +
+    'Perfiles disponibles:\n' +
+    '  DISA   → tu perfil\n' +
+    '  Andres → perfil de tu hermano\n\n' +
+    'Ejemplo:\n' +
+    'DISA|https://script.google.com/macros/s/XXX/exec\n\n' +
+    'Escribe tu configuración:',
+    `${currentProfile || 'DISA'}|${currentUrl || ''}`
+  );
+
+  if (input === null) return;
+  const parts = input.trim().split('|');
+  if (parts.length < 2) { alert('Formato incorrecto. Usa: PERFIL|URL'); return; }
+
+  const profile  = parts[0].trim();
+  const cleanUrl = parts.slice(1).join('|').trim();
+
+  if (!['DISA','Andres'].includes(profile)) { alert('Perfil no válido. Usa DISA o Andres.'); return; }
+  if (!cleanUrl) { alert('URL requerida.'); return; }
+
+  setSheetsUrl(cleanUrl);
+  setProfile(profile);
+
+  if (profile === 'Andres') {
+    state.transactions = [];
+    state.prices = {};
+    state.pricesTime = null;
+  }
+
+  updateSheetsStatus('syncing', 'Conectando…');
+  sheetsLoad().then(() => updateSheetButtons());
+}
+
+function selectProfile(key) {
+  // Update button styles
+  Object.keys(PROFILES).forEach(k => {
+    const btn = document.getElementById(`profile-btn-${k}`);
+    if (!btn) return;
+    btn.style.borderColor = k===key ? 'var(--accent)' : 'var(--border)';
+    btn.style.background  = k===key ? 'rgba(56,189,248,0.15)' : 'var(--panel-2)';
+    btn.style.color       = k===key ? 'var(--accent)' : 'var(--text)';
+  });
+  // Update note
+  const note = document.getElementById('profile-note');
+  if (note) {
+    note.style.display = 'block';
+    note.textContent = key==='Andres'
+      ? '🔒 Perfil Andrés: solo puede ver y modificar sus propios datos.'
+      : '👤 Perfil DISA: acceso completo a tus datos.';
+  }
+  // Store selection temporarily
+  window._selectedProfile = key;
+}
+
+async function applySheetsConfig() {
+  const url = (document.getElementById('sheets-url-input').value || '').trim();
+  const profile = window._selectedProfile || getProfile();
+  if (!profile) { alert('Selecciona un perfil primero.'); return; }
+  if (!url) { alert('Ingresa la URL de Apps Script.'); return; }
+
+  setSheetsUrl(url);
+  setProfile(profile);
+  document.getElementById('sheets-config-modal').style.display = 'none';
+
+  // If locked profile, clear local data before loading to ensure isolation
+  if (isLocked()) {
+    state.transactions = [];
+    state.prices = {};
+    state.pricesTime = null;
+  }
+
+  updateSheetsStatus('syncing', 'Conectando…');
+  await sheetsLoad();
+  updateSheetButtons();
+}
+
+// Auto-save to Sheets whenever state changes (respects profile)
+let _sheetsSaveDebounce = null;
+function scheduleSheetsSync() {
+  if (!getSheetsUrl() || !getProfile()) return;
+  clearTimeout(_sheetsSaveDebounce);
+  _sheetsSaveDebounce = setTimeout(() => sheetsSave(), 2000);
+}
+
+// Wire up buttons
+document.getElementById('sheets-config-btn').addEventListener('click', openSheetsConfig);
+document.getElementById('sheets-sync-btn').addEventListener('click', () => sheetsLoad());
+document.getElementById('sheets-force-upload-btn').addEventListener('click', async () => {
+  if (confirm('¿Subir los datos actuales a Google Sheets? Esto sobreescribirá los datos del perfil activo.')) {
+    await sheetsSave();
+  }
+});
+
+function updateSheetButtons() {
+  const hasUrl = !!getSheetsUrl() && !!getProfile();
+  const syncBtn = document.getElementById('sheets-sync-btn');
+  const uploadBtn = document.getElementById('sheets-force-upload-btn');
+  if (syncBtn) syncBtn.style.display = hasUrl ? 'inline-block' : 'none';
+  if (uploadBtn) uploadBtn.style.display = hasUrl ? 'inline-block' : 'none';
+}
+
+// On load
+if (getSheetsUrl() && getProfile()) {
+  updateSheetsStatus('syncing', 'Cargando…');
+  sheetsLoad();
+} else {
+  updateSheetsStatus('disconnected');
+}
+
+
+setupManualForm();
+setupSimulator();
+
+// Wire chart controls
+['chart-group','chart-periods'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', renderPremiumChart);
+});
+
+loadState();
+recompute();
+</script>
+</body>
+</html>
