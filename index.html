@@ -1699,89 +1699,100 @@ async function refreshPrices(opts) {
   const tickers = opts.tickers || collectTickers();
   const buttonId = opts.buttonId || 'refresh-prices';
   const buttonLabel = opts.buttonLabel || '🔄 Actualizar precios';
-  const scopeLabel = opts.scopeLabel || 'todas las posiciones';
   const btn = document.getElementById(buttonId);
   const status = document.getElementById('price-status');
 
-  // Second click during a running refresh -> cancel.
   if (__refreshAbort) {
     __refreshAbort.abort();
     __refreshAbort = null;
-    if (status) status.textContent = 'Cancelado por el usuario.';
+    if (status) status.textContent = 'Cancelado.';
     if (btn) { btn.textContent = buttonLabel; btn.disabled = false; }
     return;
   }
 
   if (!tickers.length) {
-    alert(opts.emptyMessage || 'No hay tickers detectados aún. Carga un CSV o ingresa transacciones manuales.');
+    alert('No hay tickers detectados. Carga un CSV o ingresa transacciones primero.');
     return;
   }
-  const apiKey = (state.apiKey || localStorage.getItem('cc_twelvedata_key') || '').trim();
+
   __refreshAbort = new AbortController();
-  const externalSignal = __refreshAbort.signal;
-  if (btn) { btn.textContent = '⏹ Cancelar actualización'; btn.disabled = false; }
-  if (status) status.textContent = `Iniciando (${tickers.length} tickers)…`;
+  const signal = __refreshAbort.signal;
+  if (btn) { btn.textContent = '⏹ Cancelar'; btn.disabled = false; }
+
+  // ── RUTA 1: Google Sheets con GOOGLEFINANCE (confiable, gratis, sin límites) ──
+  const sheetsUrl = getSheetsUrl();
+  const profile   = getProfile();
+  if (sheetsUrl && profile) {
+    if (status) status.textContent = '☁️ Consultando Google Finance via Sheets…';
+    try {
+      const sep  = sheetsUrl.includes('?') ? '&' : '?';
+      const resp = await fetch(`${sheetsUrl}${sep}action=updatePrices&profile=${encodeURIComponent(profile)}`, { signal });
+      const data = await resp.json();
+      if (data.ok && data.prices && Object.keys(data.prices).length > 0) {
+        Object.assign(state.prices, data.prices);
+        state.pricesTime = data.updated || new Date().toLocaleString();
+        saveState();
+        recompute();
+        __refreshAbort = null;
+        if (btn) { btn.textContent = buttonLabel; btn.disabled = false; }
+        if (status) status.textContent = `✅ ${Object.keys(data.prices).length} precios actualizados via Google Finance · ${new Date().toLocaleTimeString()}`;
+        return;
+      }
+      // Si Sheets devuelve error o 0 precios, caemos al fallback
+      if (data.error) console.warn('Sheets updatePrices error:', data.error);
+    } catch(e) {
+      if (signal.aborted) {
+        __refreshAbort = null;
+        if (btn) { btn.textContent = buttonLabel; btn.disabled = false; }
+        if (status) status.textContent = 'Cancelado.';
+        return;
+      }
+      console.warn('Sheets price fetch failed, falling back:', e.message);
+      if (status) status.textContent = `Sheets no disponible (${e.message}), usando Stooq…`;
+    }
+  }
+
+  // ── RUTA 2: Fallback — Stooq / TwelveData (igual que antes) ──
+  const apiKey = (state.apiKey || localStorage.getItem('cc_twelvedata_key') || '').trim();
+  if (status) status.textContent = `Consultando precios (${tickers.length} tickers) via Stooq…`;
 
   let okCount = 0, failCount = 0;
   const failed = [];
-  const sources = {};
   let pendingTickers = tickers.slice();
 
-  // FAST PATH: with API key, do ONE batch call to Twelve Data (much faster, no rate-limit issues).
   if (apiKey) {
-    if (status) status.textContent = `Consultando Twelve Data en lote (${pendingTickers.length} tickers)…`;
     try {
-      const out = await fetchTwelveDataBatch(pendingTickers, apiKey, externalSignal);
+      const out = await fetchTwelveDataBatch(pendingTickers, apiKey, signal);
       for (const [tk, px] of Object.entries(out)) {
-        state.prices[tk] = px;
-        okCount++;
-        sources['TwelveData'] = (sources['TwelveData']||0)+1;
+        state.prices[tk] = px; okCount++;
       }
       pendingTickers = pendingTickers.filter(tk => !(tk in out));
-      if (status) status.textContent = `Twelve Data: ${okCount} ok. Pendientes: ${pendingTickers.length}.`;
     } catch(e) {
       console.warn('twelvedata batch failed', e.message);
-      if (status) status.textContent = `Twelve Data falló (${e.message}). Cayendo a Stooq…`;
     }
   }
 
-  // SLOW PATH: tickers que no obtuvo TD se intentan vía Stooq con timeouts duros y delay.
-  for (let i=0; i<pendingTickers.length; i++) {
-    if (externalSignal.aborted) break;
+  for (let i = 0; i < pendingTickers.length; i++) {
+    if (signal.aborted) break;
     const tk = pendingTickers[i];
-    if (status) status.textContent = `Consultando ${tk} (${i+1}/${pendingTickers.length}) vía Stooq…`;
+    if (status) status.textContent = `Consultando ${tk} (${i+1}/${pendingTickers.length}) via Stooq…`;
     try {
-      const { price, source } = await fetchPriceCascade(tk, '', externalSignal);
-      state.prices[tk] = price;
-      sources[source] = (sources[source]||0)+1;
-      okCount++;
+      const { price } = await fetchPriceCascade(tk, '', signal);
+      state.prices[tk] = price; okCount++;
     } catch(e) {
-      failCount++;
-      failed.push(tk);
-      console.warn('price fail', tk, e.message);
+      failCount++; failed.push(tk);
     }
-    await new Promise(r=>setTimeout(r, 700));
+    await new Promise(r => setTimeout(r, 700));
   }
 
-  const wasAborted = externalSignal.aborted;
   __refreshAbort = null;
   state.pricesTime = new Date().toLocaleString();
   saveState();
   recompute();
   if (btn) { btn.textContent = buttonLabel; btn.disabled = false; }
-  const sourcesStr = Object.entries(sources).map(([k,v])=>`${v} ${k}`).join(', ') || 'ninguna';
-  if (status) {
-    status.textContent = wasAborted
-      ? `Cancelado. ${okCount} ok / ${failCount} fallidos antes de detener.`
-      : `Última actualización (${scopeLabel}): ${okCount} ok / ${failCount} fallidos. Fuentes: ${sourcesStr}.`;
-  }
-  if (failCount > 0 && !wasAborted) {
-    alert(`Precios actualizados: ${okCount} ok, ${failCount} fallidos.\n` +
-          `Fallaron: ${failed.join(', ')}\n\n` +
-          `Sugerencias:\n` +
-          ` 1) Si aún no la has configurado, agrega una API key gratuita de Twelve Data (botón "🔑 API Key").\n` +
-          ` 2) Pega los precios manualmente con el botón "📋 Pegar precios".\n` +
-          ` 3) Edita un precio individualmente desde la tabla de Opciones Abiertas.`);
+  if (status) status.textContent = `${okCount} precios actualizados${failCount > 0 ? ` · ${failCount} fallidos: ${failed.join(', ')}` : ''} · ${new Date().toLocaleTimeString()}`;
+  if (failCount > 0) {
+    alert(`${failCount} tickers fallaron: ${failed.join(', ')}\n\nSugerencia: verifica que el ticker exista en Schwab o edítalo manualmente.`);
   }
 }
 
@@ -1887,15 +1898,21 @@ document.getElementById('import-state').addEventListener('change', e=>{
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
-      if (data.transactions) {
-        state = data;
-        saveState(false); // save locally only — don't auto-sync to Sheets
-        recompute();
-        const sheetsMsg = getSheetsUrl() ? '\n\nPresiona "⬆️ Subir a Sheets" para actualizar Google Sheets con estos datos.' : '';
-        alert(`✅ Datos importados correctamente (${state.transactions.length} transacciones).${sheetsMsg}`);
-        updateSheetButtons();
+      if (!data.transactions) {
+        alert('Archivo JSON inválido: no contiene el campo "transactions".\n\nAsegúrate de exportar el JSON desde este mismo dashboard.');
+        return;
       }
-    } catch (err) { alert('Archivo JSON inválido.'); }
+      state.transactions = data.transactions;
+      if (data.prices) state.prices = data.prices;
+      if (data.pricesTime) state.pricesTime = data.pricesTime;
+      saveState(false);
+      recompute();
+      const sheetsMsg = getSheetsUrl() ? '\n\nPresiona "⬆️ Subir a Sheets" para actualizar Google Sheets.' : '';
+      alert(`✅ Importadas ${state.transactions.length} transacciones.${sheetsMsg}`);
+      updateSheetButtons();
+    } catch (err) {
+      alert('Error al leer el archivo: ' + err.message + '\n\nAsegúrate de que el archivo sea un JSON válido.');
+    }
   };
   reader.readAsText(f);
   e.target.value = '';
@@ -2054,7 +2071,7 @@ async function sheetsLoad() {
   const url = getSheetsUrl();
   const profile = getProfile();
   if (!url || !profile) return;
-  updateSheetsStatus('syncing', 'Cargando…');
+  updateSheetsStatus('syncing', 'Cargando transacciones…');
   try {
     const sep = url.includes('?') ? '&' : '?';
     const dataResp = await fetch(`${url}${sep}action=read&profile=${encodeURIComponent(profile)}`);
@@ -2072,7 +2089,27 @@ async function sheetsLoad() {
 
     saveState(false);
     recompute();
-    updateSheetsStatus('connected', `🟢 ${profile} — ${state.transactions.length} txs`);
+    updateSheetsStatus('syncing', `✅ ${state.transactions.length} txs · Actualizando precios via Google Finance…`);
+
+    // Auto-actualizar precios via GOOGLEFINANCE al cargar
+    try {
+      const priceResp = await fetch(`${url}${sep}action=updatePrices&profile=${encodeURIComponent(profile)}`);
+      const priceData = await priceResp.json();
+      if (priceData.ok && priceData.prices && Object.keys(priceData.prices).length > 0) {
+        Object.assign(state.prices, priceData.prices);
+        state.pricesTime = priceData.updated || new Date().toLocaleString();
+        saveState(false);
+        recompute();
+        updateSheetsStatus('connected', `🟢 ${profile} · ${Object.keys(priceData.prices).length} precios actualizados · ${new Date().toLocaleTimeString()}`);
+      } else {
+        updateSheetsStatus('connected', `🟢 ${profile} — ${state.transactions.length} txs (precios sin cambio)`);
+      }
+    } catch(priceErr) {
+      // Si falla la actualización de precios, no es crítico — los datos ya cargaron
+      console.warn('Auto price update failed:', priceErr.message);
+      updateSheetsStatus('connected', `🟢 ${profile} — ${state.transactions.length} txs (precios: ${priceErr.message})`);
+    }
+
   } catch(err) {
     updateSheetsStatus('error', err.message);
   }
