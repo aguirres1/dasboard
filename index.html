@@ -559,6 +559,14 @@
         <div class="roi-metric-label">Capital Comprometido <span class="info-tip" data-tip="Acciones en cartera (costo bruto) + Puts abiertos (strike × contratos × 100 − prima cobrada). Es el capital real en riesgo.">ⓘ</span></div>
         <div class="roi-metric-value" id="roi-capital">$0</div>
         <div class="roi-metric-sub" id="roi-capital-detail">— acciones + — puts</div>
+      <div style="margin-top:0.4rem;">
+        <button id="btn-load-hist" style="font-size:0.7rem;padding:3px 8px;border-radius:5px;
+          background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;"
+          title="Carga precios históricos desde Google Sheets para calcular P&L del período con precisión">
+          📅 Cargar precios históricos
+        </button>
+        <span id="hist-status" style="font-size:0.68rem;color:var(--muted);margin-left:0.4rem;"></span>
+      </div>
       </div>
       <div class="roi-metric" id="roi-metric-pct">
         <div class="roi-metric-label">ROI del Período <span class="info-tip" data-tip="★ ROI Operacional: (Primas + Dividendos + P&L Realizada) / Capital Comprometido. Mide el ingreso real generado por The Wheel, sin incluir el movimiento del precio del mercado.">ⓘ</span></div>
@@ -700,8 +708,11 @@ const PRICES_TIME_KEY = 'cc_dashboard_prices_time_v1';
 // ----- State -----
 let state = {
   transactions: [],   // raw rows
-  prices: {},         // ticker -> price
-  pricesTime: null,
+  prices:           {},   // ticker -> price
+  pricesTime:       null,
+  historicalPrices: {},   // { "YYYY-MM-DD": { ticker: price } }
+  sheetsUrl:        localStorage.getItem('cc-sheets-url') || '',
+  sheetsProfile:    localStorage.getItem('cc-sheets-profile') || 'DISA',
 };
 
 function loadState() {
@@ -2085,13 +2096,33 @@ function calcROI(tickers, period) {
   const capTotal = capStocks + capPuts;
 
   // ── P&L No Realizada — solo tickers Wheel (no LP) ────────
+  // Si hay precios históricos disponibles, usamos la variación del período
+  // para evitar atribuir pérdidas de meses enteros a un período corto.
+  // Si no hay históricos, usamos la variación vs costo (acumulada).
+  const histPrices = state.historicalPrices || {};
+  const hasHist    = histPrices[fromStr] && Object.keys(histPrices[fromStr]).length > 0;
+
   let unrealized = 0;
   for (const t of Object.values(tickers)) {
     if (lpExclusions.has(t.ticker)) continue;
     if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
-    if (t.shares > 0) {
-      const px = state.prices[t.ticker] || 0;
-      if (px > 0) unrealized += t.shares * (px - (t.costGross / t.shares));
+    if (t.shares < 1) continue;
+
+    const pxNow  = state.prices[t.ticker] || 0;
+    if (pxNow <= 0) continue;
+
+    if (hasHist) {
+      // Variación real del período (precio hoy vs precio al inicio del período)
+      const pxThen = (histPrices[fromStr] || {})[t.ticker] || 0;
+      if (pxThen > 0) {
+        unrealized += t.shares * (pxNow - pxThen);
+      } else {
+        // Sin histórico para este ticker → fallback a variación vs costo
+        unrealized += t.shares * (pxNow - (t.costGross / t.shares));
+      }
+    } else {
+      // Sin precios históricos → variación vs costo bruto promedio
+      unrealized += t.shares * (pxNow - (t.costGross / t.shares));
     }
   }
 
@@ -2238,7 +2269,9 @@ function renderROI(tickers, period) {
 
   const periodLabels = { '7':'últimos 7 días', '30':'últimos 30 días',
     '90':'últimos 90 días', '180':'últimos 180 días', 'ytd':'año en curso', 'all':'todo el período' };
-  if (roiLbl) roiLbl.textContent = periodLabels[String(period)] || '';
+  const hasHistData = state.historicalPrices && Object.keys(state.historicalPrices).length > 0;
+  const histNote = hasHistData ? '' : ' (sin precios históricos — usando variación vs costo)';
+  if (roiLbl) roiLbl.textContent = (periodLabels[String(period)] || '') + histNote;
 
   // P&L no realizada — siempre visible como información
   const unrEl  = document.getElementById('roi-unrealized');
@@ -2283,6 +2316,74 @@ function renderROI(tickers, period) {
   if (netEl) {
     netEl.innerHTML = `<span class="${r.periodNetResult>=0?'pos':'neg'}" style="font-weight:700">${fmtMoney(r.periodNetResult)}</span>`;
   }
+}
+
+// ── Cache de precios históricos ──────────────────────────────
+// { "2026-05-17": { "BAC": 54.20, "ORCL": 195.30 } }
+const _histPricesCache = {};
+let   _histPricesFetching = false;
+
+async function fetchHistoricalPrices(sheetsUrl, profile, tickers, periods) {
+  /**
+   * Consulta el Apps Script para obtener precios históricos.
+   * Guarda en cache para no repetir la llamada en el mismo período.
+   * Si no hay sheetsUrl configurada, devuelve vacío silenciosamente.
+   */
+  if (!sheetsUrl || !tickers.length) return {};
+
+  const cacheKey = periods.join(',') + '|' + tickers.sort().join(',');
+  if (_histPricesCache[cacheKey]) return _histPricesCache[cacheKey];
+  if (_histPricesFetching) return {};
+
+  try {
+    _histPricesFetching = true;
+    const sep = sheetsUrl.includes('?') ? '&' : '?';
+    const url = `${sheetsUrl}${sep}action=historicalPrices&profile=${profile}&tickers=${tickers.join(',')}&periods=${periods.join(',')}`;
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await resp.json();
+    if (data.ok && data.prices) {
+      _histPricesCache[cacheKey] = data.prices;
+      return data.prices;
+    }
+  } catch(e) {
+    console.warn('Historical prices fetch failed:', e.message);
+  } finally {
+    _histPricesFetching = false;
+  }
+  return {};
+}
+
+function calcUnrealizedForPeriod(tickers, historicalPrices, fromDateStr) {
+  /**
+   * Calcula P&L no realizada DEL PERÍODO usando precios históricos.
+   * P&L período = (precio HOY - precio al inicio del período) × acciones
+   *
+   * Esto evita la distorsión de usar la P&L total acumulada
+   * (que puede ser de meses) como si fuera del período seleccionado.
+   */
+  const lpExclusions = getLPExclusions();
+  let unrealizedPeriod = 0;
+
+  for (const t of Object.values(tickers)) {
+    if (lpExclusions.has(t.ticker)) continue;
+    if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
+    if (t.shares < 1) continue;
+
+    const pxNow  = state.prices[t.ticker] || 0;
+    const pxThen = (historicalPrices[fromDateStr] || {})[t.ticker] || 0;
+
+    if (pxNow > 0 && pxThen > 0) {
+      // Variación real del período
+      unrealizedPeriod += t.shares * (pxNow - pxThen);
+    } else if (pxNow > 0) {
+      // Sin precio histórico → usar variación vs costo (fallback)
+      unrealizedPeriod += t.shares * (pxNow - (t.costGross / t.shares));
+    }
+  }
+  return unrealizedPeriod;
 }
 
 // ── LP State (persiste en localStorage) ──────────────────────
@@ -2333,6 +2434,56 @@ function setupROITabs() {
       renderROI(tickers, _roiPeriod);
     });
   });
+
+  // Botón de precios históricos
+  const btnHist = document.getElementById('btn-load-hist');
+  if (btnHist) {
+    btnHist.addEventListener('click', async () => {
+      const sheetsUrl = state.sheetsUrl || localStorage.getItem('cc-sheets-url') || '';
+      const profile   = state.sheetsProfile || 'DISA';
+      if (!sheetsUrl) {
+        alert('Configura la URL de Google Sheets en Ajustes para usar precios históricos.');
+        return;
+      }
+
+      const histStatus = document.getElementById('hist-status');
+      if (histStatus) histStatus.textContent = '⏳ Cargando...';
+      btnHist.disabled = true;
+
+      // Obtener tickers Wheel activos
+      const tickers  = aggregate();
+      const lpExcl   = getLPExclusions();
+      const wheelTks = Object.values(tickers)
+        .filter(t => t.shares >= 1 && t.hasOptionHistory && !lpExcl.has(t.ticker))
+        .map(t => t.ticker);
+
+      if (!wheelTks.length) {
+        if (histStatus) histStatus.textContent = '⚠ Sin tickers Wheel activos';
+        btnHist.disabled = false;
+        return;
+      }
+
+      try {
+        const histData = await fetchHistoricalPrices(
+          sheetsUrl, profile, wheelTks, ['7','30','90','180','ytd']
+        );
+
+        if (Object.keys(histData).length > 0) {
+          state.historicalPrices = histData;
+          const dates = Object.keys(histData).length;
+          if (histStatus) histStatus.textContent = `✓ ${dates} fechas cargadas`;
+          // Recalcular ROI con los nuevos precios
+          renderROI(tickers, _roiPeriod);
+        } else {
+          if (histStatus) histStatus.textContent = '⚠ Sin datos — verifica la URL de Sheets';
+        }
+      } catch(e) {
+        if (histStatus) histStatus.textContent = `✗ Error: ${e.message}`;
+      } finally {
+        btnHist.disabled = false;
+      }
+    });
+  }
 }
 
 
@@ -2375,7 +2526,7 @@ document.getElementById('bulk-prices-btn').addEventListener('click', openBulkPri
 document.getElementById('api-key-btn').addEventListener('click', openApiKeyDialog);
 document.getElementById('clear-data').addEventListener('click', ()=>{
   if (confirm('¿Borrar todos los datos almacenados? Considera exportar el JSON antes.')) {
-    state = { transactions:[], prices:{}, pricesTime:null };
+    state = { transactions:[], prices:{}, pricesTime:null, historicalPrices:{}, sheetsUrl: state.sheetsUrl||'', sheetsProfile: state.sheetsProfile||'DISA' };
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(PRICES_KEY);
     localStorage.removeItem(PRICES_TIME_KEY);
