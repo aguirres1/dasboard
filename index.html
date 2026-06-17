@@ -220,6 +220,17 @@
     white-space:normal; width:220px; z-index:100; pointer-events:none;
   }
 
+  /* ---- LP Toggle ---- */
+  .lp-badge { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.68rem;
+    padding:2px 7px; border-radius:10px; cursor:pointer; user-select:none;
+    transition:all .15s; border:1px solid; font-weight:600; }
+  .lp-badge.is-lp { background:#FEF9EC; color:#92680F; border-color:#F0D780; }
+  .lp-badge.not-lp { background:#EEF7F2; color:#1A6B3C; border-color:#C3E0CE; }
+  .lp-excluded-bar { background:var(--panel-2); border-radius:8px; padding:0.6rem 1rem;
+    margin-bottom:0.8rem; font-size:0.78rem; color:var(--muted);
+    display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+  .lp-excluded-bar strong { color:var(--text); }
+
   /* ---- ROI Period Panel ---- */
   .roi-panel { background:var(--panel); border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:1.5rem; }
   .roi-panel-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem; margin-bottom:1rem; }
@@ -545,6 +556,11 @@
         <div class="roi-metric-sub" id="roi-unrealized-detail">vs costo bruto</div>
       </div>
     </div>
+    <div class="lp-excluded-bar" id="lp-excluded-bar" style="display:none;">
+      <strong>Excluidos del cálculo (LP):</strong>
+      <span id="lp-excluded-list">—</span>
+      <span style="margin-left:auto;font-size:0.72rem;">Marca/desmarca en la tabla de posiciones →</span>
+    </div>
     <div class="roi-breakdown" id="roi-breakdown">
       <div class="roi-breakdown-item">Primas período: <span class="pos" id="rb-premium">$0</span></div>
       <div class="roi-breakdown-item">Dividendos período: <span class="pos" id="rb-dividends">$0</span></div>
@@ -595,6 +611,7 @@
         <thead>
           <tr>
             <th>Ticker</th>
+            <th>Rol <span class="info-tip" data-tip="WHEEL = capital activo en La Rueda. LP = Long Position, inversión directa excluida del cálculo de rentabilidad. Haz clic para cambiar.">ⓘ</span></th>
             <th>Acciones</th>
             <th>Costo Bruto</th>
             <th>Costo Promedio</th>
@@ -1650,8 +1667,14 @@ function renderPositions(tickers) {
     const px = state.prices[t.ticker];
     const unrealized = px && t.shares>0 ? (px - (adjustedPerShare||avgCost))*t.shares : null;
     const tr = document.createElement('tr');
+    const isLP = getLPExclusions().has(t.ticker);
+    const lpBadge = `<span class="lp-badge ${isLP?'is-lp':'not-lp'}"
+      onclick="toggleLP('${t.ticker}')" title="Clic para cambiar rol">
+      ${isLP ? '📦 LP' : '🔄 WHEEL'}
+    </span>`;
     tr.innerHTML = `
       <td><strong>${t.ticker}</strong></td>
+      <td>${lpBadge}</td>
       <td>${t.shares.toFixed(0)}</td>
       <td>${fmtMoney(t.costGross)}</td>
       <td>${avgCost ? fmtMoney(avgCost) : '—'}</td>
@@ -2011,24 +2034,33 @@ function calcROI(tickers, period) {
   const txs = filteredTransactions();
 
   // ── Capital comprometido ACTUAL ──────────────────────────
-  let capStocks = 0; // costo bruto acciones en cartera
-  let capPuts   = 0; // puts: strike×100×contratos − prima cobrada
+  // Solo tickers con historial de opciones (hasOptionHistory)
+  // y NO marcados como LP (Long Position — inversión directa)
+  const lpExclusions = getLPExclusions();
+  let capStocks = 0;
+  let capPuts   = 0;
 
   for (const t of Object.values(tickers)) {
+    // Excluir: LP explícito, o sin historial de opciones
+    if (lpExclusions.has(t.ticker)) continue;
+    if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
+
     if (t.shares > 0) capStocks += t.costGross;
     for (const lot of t.openOptions) {
       if (lot.type === 'P') {
-        const gross    = lot.strike * lot.contracts * 100;
-        const premium  = Math.max(0, parseFloat(lot.premiumNet) || 0);
+        const gross   = lot.strike * lot.contracts * 100;
+        const premium = Math.max(0, parseFloat(lot.premiumNet) || 0);
         capPuts += Math.max(0, gross - premium);
       }
     }
   }
   const capTotal = capStocks + capPuts;
 
-  // ── P&L No Realizada (siempre con precios actuales) ──────
+  // ── P&L No Realizada — solo tickers Wheel (no LP) ────────
   let unrealized = 0;
   for (const t of Object.values(tickers)) {
+    if (lpExclusions.has(t.ticker)) continue;
+    if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
     if (t.shares > 0) {
       const px = state.prices[t.ticker] || 0;
       if (px > 0) unrealized += t.shares * (px - (t.costGross / t.shares));
@@ -2178,6 +2210,35 @@ function renderROI(tickers, period) {
   setBreakdown('rb-unrealized', r.unrealized);
   setBreakdown('rb-cap-stocks', r.capStocks);
   setBreakdown('rb-cap-puts',   r.capPuts);
+}
+
+// ── LP State (persiste en localStorage) ──────────────────────
+const LP_KEY = 'cc-lp-exclusions';
+function getLPExclusions() {
+  try { return new Set(JSON.parse(localStorage.getItem(LP_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function toggleLP(ticker) {
+  const lps = getLPExclusions();
+  if (lps.has(ticker)) lps.delete(ticker);
+  else lps.add(ticker);
+  localStorage.setItem(LP_KEY, JSON.stringify([...lps]));
+  const tickers = aggregate();
+  renderPositions(tickers);
+  renderROI(tickers, _roiPeriod);
+  updateLPBar();
+}
+function updateLPBar() {
+  const lps = getLPExclusions();
+  const bar  = document.getElementById('lp-excluded-bar');
+  const list = document.getElementById('lp-excluded-list');
+  if (!bar || !list) return;
+  if (lps.size === 0) {
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'flex';
+    list.textContent = [...lps].sort().join(', ');
+  }
 }
 
 function setupROITabs() {
@@ -2609,6 +2670,7 @@ if (getSheetsUrl() && getProfile()) {
 setupManualForm();
 setupSimulator();
 setupROITabs();
+updateLPBar();
 
 // Wire chart controls
 ['chart-group','chart-periods'].forEach(id => {
