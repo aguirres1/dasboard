@@ -219,6 +219,31 @@
     padding:6px 10px; border-radius:6px; font-size:0.72rem; line-height:1.4;
     white-space:normal; width:220px; z-index:100; pointer-events:none;
   }
+
+  /* ---- ROI Period Panel ---- */
+  .roi-panel { background:var(--panel); border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:1.5rem; }
+  .roi-panel-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem; margin-bottom:1rem; }
+  .roi-panel-header h2 { font-size:1rem; font-weight:700; color:var(--text); }
+  .roi-period-tabs { display:flex; gap:0.4rem; flex-wrap:wrap; }
+  .roi-tab { background:var(--panel-2); border:1px solid var(--border); color:var(--muted);
+    padding:0.3rem 0.8rem; border-radius:6px; font-size:0.78rem; cursor:pointer; transition:all .15s; }
+  .roi-tab:hover { border-color:var(--accent); color:var(--accent); }
+  .roi-tab.active { background:var(--accent); border-color:var(--accent); color:#0f172a; font-weight:700; }
+  .roi-metrics { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:0.8rem; }
+  .roi-metric { background:var(--panel-2); border-radius:8px; padding:0.8rem 1rem; border-left:3px solid var(--border); }
+  .roi-metric.green { border-left-color:var(--green); }
+  .roi-metric.red   { border-left-color:var(--red); }
+  .roi-metric.blue  { border-left-color:var(--accent); }
+  .roi-metric.gold  { border-left-color:#f59e0b; }
+  .roi-metric-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:0.3rem; }
+  .roi-metric-value { font-size:1.2rem; font-weight:700; font-family:monospace; }
+  .roi-metric-sub   { font-size:0.7rem; color:var(--muted); margin-top:0.2rem; }
+  .roi-breakdown { margin-top:1rem; padding-top:0.8rem; border-top:1px solid var(--border);
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:0.5rem; }
+  .roi-breakdown-item { font-size:0.78rem; color:var(--muted); }
+  .roi-breakdown-item span { font-weight:600; font-family:monospace; }
+  .roi-breakdown-item span.pos { color:var(--green); }
+  .roi-breakdown-item span.neg { color:var(--red); }
 </style>
 </head>
 <body>
@@ -483,6 +508,51 @@
         </div>
       </div>
     </details>
+  </section>
+
+  <!-- ══ ROI POR PERÍODO ══ -->
+  <section class="panel roi-panel">
+    <div class="roi-panel-header">
+      <h2>📈 Rentabilidad del Capital</h2>
+      <div class="roi-period-tabs">
+        <button class="roi-tab active" data-period="7">7 días</button>
+        <button class="roi-tab" data-period="30">30 días</button>
+        <button class="roi-tab" data-period="90">90 días</button>
+        <button class="roi-tab" data-period="180">180 días</button>
+        <button class="roi-tab" data-period="ytd">YTD</button>
+        <button class="roi-tab" data-period="all">Todo</button>
+      </div>
+    </div>
+    <div class="roi-metrics" id="roi-metrics-grid">
+      <div class="roi-metric blue">
+        <div class="roi-metric-label">Capital Comprometido <span class="info-tip" data-tip="Acciones en cartera (costo bruto) + Puts abiertos (strike × contratos × 100 − prima cobrada). Es el capital real en riesgo.">ⓘ</span></div>
+        <div class="roi-metric-value" id="roi-capital">$0</div>
+        <div class="roi-metric-sub" id="roi-capital-detail">— acciones + — puts</div>
+      </div>
+      <div class="roi-metric" id="roi-metric-pct">
+        <div class="roi-metric-label">ROI del Período <span class="info-tip" data-tip="(Primas + Dividendos + P&L Realizada + P&L No Realizada del período) / Capital Comprometido del período.">ⓘ</span></div>
+        <div class="roi-metric-value" id="roi-pct">0.00%</div>
+        <div class="roi-metric-sub" id="roi-period-label">últimos 7 días</div>
+      </div>
+      <div class="roi-metric" id="roi-metric-ann">
+        <div class="roi-metric-label">ROI Anualizado</div>
+        <div class="roi-metric-value" id="roi-ann">0.00%</div>
+        <div class="roi-metric-sub">extrapolado al año</div>
+      </div>
+      <div class="roi-metric green">
+        <div class="roi-metric-label">P&amp;L No Realizada <span class="info-tip" data-tip="Ganancia o pérdida potencial de acciones en cartera vs precio actual. No es dinero real hasta que vendas.">ⓘ</span></div>
+        <div class="roi-metric-value" id="roi-unrealized">$0</div>
+        <div class="roi-metric-sub" id="roi-unrealized-detail">vs costo bruto</div>
+      </div>
+    </div>
+    <div class="roi-breakdown" id="roi-breakdown">
+      <div class="roi-breakdown-item">Primas período: <span class="pos" id="rb-premium">$0</span></div>
+      <div class="roi-breakdown-item">Dividendos período: <span class="pos" id="rb-dividends">$0</span></div>
+      <div class="roi-breakdown-item">P&amp;L realizada período: <span id="rb-realized">$0</span></div>
+      <div class="roi-breakdown-item">P&amp;L no realizada: <span id="rb-unrealized">$0</span></div>
+      <div class="roi-breakdown-item">Capital acciones: <span id="rb-cap-stocks">$0</span></div>
+      <div class="roi-breakdown-item">Capital puts: <span id="rb-cap-puts">$0</span></div>
+    </div>
   </section>
 
   <!-- Posiciones de opción abiertas -->
@@ -1019,6 +1089,7 @@ function recompute() {
   refreshAccountSelector();
   const tickers = aggregate();
   renderKPIs(tickers);
+  renderROI(tickers, _roiPeriod);
   renderOpenOptions(tickers);
   renderPositions(tickers);
   renderHistory();
@@ -1892,6 +1963,236 @@ function openBulkPriceDialog() {
   alert(`Precios actualizados manualmente: ${updated} tickers.`);
 }
 
+// ════════════════════════════════════════════════════════
+// ROI POR PERÍODO
+// ════════════════════════════════════════════════════════
+
+let _roiPeriod = 7; // días seleccionados actualmente
+
+function getPeriodDates(period) {
+  const today = new Date();
+  today.setHours(23,59,59,999);
+  const todayStr = today.toISOString().slice(0,10);
+
+  let fromDate;
+  if (period === 'all') {
+    fromDate = new Date('2000-01-01');
+  } else if (period === 'ytd') {
+    fromDate = new Date(today.getFullYear(), 0, 1);
+  } else {
+    fromDate = new Date(today);
+    fromDate.setDate(fromDate.getDate() - parseInt(period));
+  }
+  const fromStr = fromDate.toISOString().slice(0,10);
+  const days = period === 'all' ? 365 :
+               period === 'ytd' ? Math.ceil((today - fromDate)/(1000*60*60*24)) :
+               parseInt(period);
+  return { fromStr, todayStr, days };
+}
+
+function calcROI(tickers, period) {
+  /**
+   * Calcula rentabilidad real del capital para el período dado.
+   *
+   * Capital comprometido:
+   *   - Acciones: costo bruto de posiciones en cartera
+   *   - Puts abiertos: (strike × contratos × 100) − prima ya cobrada del contrato
+   *
+   * Retorno del período:
+   *   - Primas netas cobradas/pagadas con fecha dentro del período
+   *   - Dividendos recibidos en el período
+   *   - P&L realizada de ventas en el período
+   *   - P&L no realizada actual (precio actual vs costo bruto)
+   *
+   * ROI = retorno_total / capital_comprometido
+   * ROI Anualizado = ROI × (365 / días_período)
+   */
+  const { fromStr, todayStr, days } = getPeriodDates(period);
+  const txs = filteredTransactions();
+
+  // ── Capital comprometido ACTUAL ──────────────────────────
+  let capStocks = 0; // costo bruto acciones en cartera
+  let capPuts   = 0; // puts: strike×100×contratos − prima cobrada
+
+  for (const t of Object.values(tickers)) {
+    if (t.shares > 0) capStocks += t.costGross;
+    for (const lot of t.openOptions) {
+      if (lot.type === 'P') {
+        const gross    = lot.strike * lot.contracts * 100;
+        const premium  = Math.max(0, parseFloat(lot.premiumNet) || 0);
+        capPuts += Math.max(0, gross - premium);
+      }
+    }
+  }
+  const capTotal = capStocks + capPuts;
+
+  // ── P&L No Realizada (siempre con precios actuales) ──────
+  let unrealized = 0;
+  for (const t of Object.values(tickers)) {
+    if (t.shares > 0) {
+      const px = state.prices[t.ticker] || 0;
+      if (px > 0) unrealized += t.shares * (px - (t.costGross / t.shares));
+    }
+  }
+
+  // ── Retorno del período (solo transacciones en rango) ────
+  let periodPremium   = 0;
+  let periodDividends = 0;
+  let periodRealized  = 0;
+
+  // Para P&L realizada del período necesitamos recalcular
+  // solo las ventas que ocurrieron en el rango
+  const OPTION_RE = /^([A-Z]{1,5})\s+\d{2}\/\d{2}\/\d{4}\s+[\d.]+\s+[CP]$/;
+  const DIVIDEND_ACTIONS = new Set(['cash dividend','qualified dividend','special dividend',
+    'reinvest dividend','non-qualified dividend','prior year cash dividend','qual div reinvest']);
+
+  // Primero reconstruir costo promedio HASTA el inicio del período
+  const costBefore = {}; // ticker → {shares, costGross}
+  for (const tx of txs) {
+    if (tx.date >= fromStr) break; // solo transacciones anteriores al período
+    const sym    = (tx.symbol||'').trim();
+    const action = (tx.action||'').toLowerCase();
+    const amount = tx.amount || 0;
+    const qty    = Math.abs(tx.quantity || 0);
+    if (OPTION_RE.test(sym)) continue;
+    if (!costBefore[sym]) costBefore[sym] = { shares:0, costGross:0 };
+    const cb = costBefore[sym];
+    if (action === 'buy' || action === 'reinvest shares') {
+      cb.shares    += qty;
+      cb.costGross += Math.abs(amount);
+    } else if (action === 'sell') {
+      if (cb.shares > 0) {
+        const avg  = cb.costGross / cb.shares;
+        const sold = Math.min(qty, cb.shares);
+        cb.costGross -= sold * avg;
+        cb.shares    -= sold;
+      }
+    }
+  }
+
+  // Ahora calcular retornos DEL período
+  for (const tx of txs) {
+    if (tx.date < fromStr || tx.date > todayStr) continue;
+    const sym    = (tx.symbol||'').trim();
+    const action = (tx.action||'').toLowerCase();
+    const amount = tx.amount || 0;
+    const qty    = Math.abs(tx.quantity || 0);
+
+    if (OPTION_RE.test(sym)) {
+      if (action === 'sell to open' || action === 'buy to close') {
+        periodPremium += amount;
+      }
+    } else {
+      if (DIVIDEND_ACTIONS.has(action)) {
+        periodDividends += amount;
+      } else if (action === 'sell') {
+        // P&L realizada del período
+        if (!costBefore[sym]) costBefore[sym] = { shares:0, costGross:0 };
+        const cb = costBefore[sym];
+        if (cb.shares > 0) {
+          const avg     = cb.costGross / cb.shares;
+          const sold    = Math.min(qty, cb.shares);
+          const salePx  = Math.abs(amount) / qty;
+          periodRealized += sold * (salePx - avg);
+          const frac     = sold / cb.shares;
+          cb.costGross  -= frac * cb.costGross;
+          cb.shares     -= sold;
+        }
+      } else if (action === 'buy' || action === 'reinvest shares') {
+        if (!costBefore[sym]) costBefore[sym] = { shares:0, costGross:0 };
+        costBefore[sym].shares    += qty;
+        costBefore[sym].costGross += Math.abs(amount);
+      }
+    }
+  }
+
+  const periodReturn = periodPremium + periodDividends + periodRealized + unrealized;
+  const roi    = capTotal > 0 ? (periodReturn / capTotal) * 100 : 0;
+  const roiAnn = days   > 0  ? roi * (365 / days)               : 0;
+
+  return {
+    capTotal, capStocks, capPuts,
+    unrealized, periodPremium, periodDividends, periodRealized,
+    periodReturn, roi, roiAnn, days,
+  };
+}
+
+function renderROI(tickers, period) {
+  const r = calcROI(tickers, period);
+
+  // Capital comprometido
+  const capEl = document.getElementById('roi-capital');
+  const capDet = document.getElementById('roi-capital-detail');
+  if (capEl) capEl.textContent = fmtMoney(r.capTotal);
+  if (capDet) capDet.textContent =
+    `Acciones ${fmtMoney(r.capStocks)} + Puts ${fmtMoney(r.capPuts)}`;
+
+  // ROI período
+  const roiEl  = document.getElementById('roi-pct');
+  const roiAnn = document.getElementById('roi-ann');
+  const roiLbl = document.getElementById('roi-period-label');
+  const roiM   = document.getElementById('roi-metric-pct');
+  const roiMA  = document.getElementById('roi-metric-ann');
+  if (roiEl) {
+    roiEl.textContent = r.roi.toFixed(2) + '%';
+    roiEl.className   = 'roi-metric-value ' + (r.roi >= 0 ? 'pos' : 'neg');
+  }
+  if (roiAnn) {
+    roiAnn.textContent = r.roiAnn.toFixed(2) + '%';
+    roiAnn.className   = 'roi-metric-value ' + (r.roiAnn >= 0 ? 'pos' : 'neg');
+  }
+  if (roiM)  roiM.className  = 'roi-metric ' + (r.roi >= 0 ? 'green' : 'red');
+  if (roiMA) roiMA.className = 'roi-metric ' + (r.roiAnn >= 0 ? 'green' : 'red');
+
+  const periodLabels = { '7':'últimos 7 días', '30':'últimos 30 días',
+    '90':'últimos 90 días', '180':'últimos 180 días', 'ytd':'año en curso', 'all':'todo el período' };
+  if (roiLbl) roiLbl.textContent = periodLabels[String(period)] || '';
+
+  // P&L no realizada
+  const unrEl  = document.getElementById('roi-unrealized');
+  const unrDet = document.getElementById('roi-unrealized-detail');
+  if (unrEl) {
+    unrEl.textContent = fmtMoney(r.unrealized);
+    unrEl.className   = 'roi-metric-value ' + (r.unrealized >= 0 ? 'pos' : 'neg');
+    const parent = unrEl.closest('.roi-metric');
+    if (parent) parent.className = 'roi-metric ' + (r.unrealized >= 0 ? 'green' : 'red');
+  }
+  if (unrDet) unrDet.textContent = r.unrealized >= 0
+    ? `+${fmtMoney(r.unrealized)} ganancia latente`
+    : `${fmtMoney(r.unrealized)} pérdida latente`;
+
+  // Breakdown
+  const fmt = (v) => {
+    const el = document.createElement('span');
+    el.textContent = fmtMoney(v);
+    el.className = v >= 0 ? 'pos' : 'neg';
+    return el.outerHTML;
+  };
+  const setBreakdown = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = fmt(v);
+  };
+  setBreakdown('rb-premium',    r.periodPremium);
+  setBreakdown('rb-dividends',  r.periodDividends);
+  setBreakdown('rb-realized',   r.periodRealized);
+  setBreakdown('rb-unrealized', r.unrealized);
+  setBreakdown('rb-cap-stocks', r.capStocks);
+  setBreakdown('rb-cap-puts',   r.capPuts);
+}
+
+function setupROITabs() {
+  document.querySelectorAll('.roi-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.roi-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _roiPeriod = btn.dataset.period;
+      const tickers = aggregate();
+      renderROI(tickers, _roiPeriod);
+    });
+  });
+}
+
+
 // ----- Wiring -----
 document.getElementById('csv-input').addEventListener('change', e => {
   if (e.target.files.length) handleFiles(e.target.files);
@@ -2307,6 +2608,7 @@ if (getSheetsUrl() && getProfile()) {
 
 setupManualForm();
 setupSimulator();
+setupROITabs();
 
 // Wire chart controls
 ['chart-group','chart-periods'].forEach(id => {
