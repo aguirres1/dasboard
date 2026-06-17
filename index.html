@@ -707,12 +707,10 @@ const PRICES_TIME_KEY = 'cc_dashboard_prices_time_v1';
 
 // ----- State -----
 let state = {
-  transactions: [],   // raw rows
-  prices:           {},   // ticker -> price
+  transactions:     [],
+  prices:           {},
   pricesTime:       null,
-  historicalPrices: {},   // { "YYYY-MM-DD": { ticker: price } }
-  sheetsUrl:        getSheetsUrl ? getSheetsUrl() : '',
-  sheetsProfile:    localStorage.getItem('cc-sheets-profile') || 'DISA',
+  historicalPrices: {},
 };
 
 function loadState() {
@@ -2526,7 +2524,7 @@ document.getElementById('bulk-prices-btn').addEventListener('click', openBulkPri
 document.getElementById('api-key-btn').addEventListener('click', openApiKeyDialog);
 document.getElementById('clear-data').addEventListener('click', ()=>{
   if (confirm('¿Borrar todos los datos almacenados? Considera exportar el JSON antes.')) {
-    state = { transactions:[], prices:{}, pricesTime:null, historicalPrices:{}, sheetsUrl: state.sheetsUrl||'', sheetsProfile: state.sheetsProfile||'DISA' };
+    state = { transactions:[], prices:{}, pricesTime:null, historicalPrices:{} };
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(PRICES_KEY);
     localStorage.removeItem(PRICES_TIME_KEY);
