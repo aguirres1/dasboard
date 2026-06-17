@@ -711,7 +711,7 @@ let state = {
   prices:           {},   // ticker -> price
   pricesTime:       null,
   historicalPrices: {},   // { "YYYY-MM-DD": { ticker: price } }
-  sheetsUrl:        localStorage.getItem('cc-sheets-url') || '',
+  sheetsUrl:        getSheetsUrl ? getSheetsUrl() : '',
   sheetsProfile:    localStorage.getItem('cc-sheets-profile') || 'DISA',
 };
 
@@ -2439,10 +2439,10 @@ function setupROITabs() {
   const btnHist = document.getElementById('btn-load-hist');
   if (btnHist) {
     btnHist.addEventListener('click', async () => {
-      const sheetsUrl = state.sheetsUrl || localStorage.getItem('cc-sheets-url') || '';
-      const profile   = state.sheetsProfile || 'DISA';
+      const sheetsUrl = getSheetsUrl();
+      const profile   = getSheetsProfile ? getSheetsProfile() : 'DISA';
       if (!sheetsUrl) {
-        alert('Configura la URL de Google Sheets en Ajustes para usar precios históricos.');
+        alert('Configura la URL de Google Sheets en el panel de Ajustes del dashboard.');
         return;
       }
 
