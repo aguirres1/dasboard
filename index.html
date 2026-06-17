@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Covered Calls v5</title>
+<title>Dashboard Covered Calls v6</title>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -208,12 +208,60 @@
   .ann-good { color: var(--green); font-weight:600; }
   .ann-ok { color: var(--yellow); }
   .ann-low { color: var(--muted); }
+
+  /* ---- Info tooltips ---- */
+  .info-tooltip { position:relative; display:inline-block; }
+  .info-tooltip:hover::after {
+    content: attr(data-tip);
+    position:absolute; left:50%; bottom:calc(100% + 6px);
+    transform:translateX(-50%);
+    background:#0f172a; color:#e2e8f0; border:1px solid #475569;
+    padding:6px 10px; border-radius:6px; font-size:0.72rem; line-height:1.4;
+    white-space:normal; width:220px; z-index:100; pointer-events:none;
+  }
+
+  /* ---- Covered Call suggestion box ---- */
+  .cc-suggest { background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.3);
+    border-radius:8px; padding:0.8rem 1rem; margin-top:0.8rem; }
+  .cc-suggest h4 { color:var(--accent); font-size:0.85rem; margin:0 0 0.5rem; }
+  .cc-suggest .cc-grid { display:flex; gap:0.6rem; flex-wrap:wrap; }
+  .cc-suggest .cc-item { background:var(--panel); border-radius:6px; padding:0.4rem 0.7rem;
+    font-size:0.78rem; flex:1; min-width:100px; }
+  .cc-suggest .cc-label { color:var(--muted); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.04em; }
+  .cc-suggest .cc-val { font-weight:700; margin-top:2px; color:var(--accent); }
+
+  /* ---- Glosario ---- */
+  .glosario-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:0.8rem; }
+  .glosario-item { background:var(--panel-2); border-radius:8px; padding:0.8rem 1rem;
+    border-left:3px solid var(--accent); }
+  .glosario-term { font-weight:700; font-size:0.88rem; color:var(--accent); margin-bottom:0.3rem; }
+  .glosario-def { font-size:0.78rem; color:var(--muted); line-height:1.5; }
+  .glosario-example { font-size:0.72rem; color:var(--text); margin-top:0.3rem;
+    background:var(--panel); border-radius:4px; padding:3px 7px; font-style:italic; }
+
+  /* ---- Value screener ---- */
+  .screener-controls { display:flex; gap:0.6rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem; }
+  .screener-controls label { display:flex; flex-direction:column; gap:3px; font-size:0.72rem;
+    color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+  .screener-controls input, .screener-controls select {
+    background:var(--panel); color:var(--text); border:1px solid var(--border);
+    border-radius:6px; padding:0.4rem 0.6rem; font-size:0.82rem; width:120px; }
+  .screener-result { background:var(--panel-2); border-radius:8px; padding:0.7rem 1rem;
+    border-left:4px solid var(--green); margin-bottom:0.5rem; cursor:pointer; }
+  .screener-result:hover { border-left-color:var(--accent); }
+  .screener-result .sr-ticker { font-size:1rem; font-weight:700; color:var(--text); }
+  .screener-result .sr-name { font-size:0.75rem; color:var(--muted); }
+  .screener-result .sr-metrics { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem; }
+  .screener-result .sr-pill { font-size:0.7rem; background:var(--panel); border-radius:4px;
+    padding:2px 7px; color:var(--text); }
+  .screener-result .sr-pill.good { color:var(--green); }
+  .screener-result .sr-pill.warn { color:var(--yellow); }
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>📈 Dashboard Covered Calls</h1>
+    <h1>📈 Dashboard Covered Calls <span style="font-size:0.75rem;color:var(--muted);font-weight:400;">v6</span></h1>
     <div class="muted">Tracker local de operaciones Schwab — sin servidor, datos guardados en tu navegador</div>
   </div>
   <div class="controls">
@@ -287,6 +335,21 @@
         <div class="label">Última actualización de precios</div>
         <div class="value" id="kpi-prices-time" style="font-size:1rem;">—</div>
         <div class="muted" id="price-status" style="font-size:0.7rem; margin-top:4px;"></div>
+      </div>
+      <div class="stat" id="kpi-net-stat" style="border-left-color:var(--yellow);">
+        <div class="label" style="display:flex;align-items:center;gap:0.3rem;">
+          P&amp;L Neto Total
+          <span class="info-tooltip" data-tip="Resultado real de toda la actividad: Primas cobradas + Ganancias/Pérdidas por ventas de acciones + Dividendos. Incluye pérdidas como la venta de WMT a $116 habiendo comprado a $119." style="cursor:help;color:var(--muted);font-size:0.9rem;">ⓘ</span>
+        </div>
+        <div class="value" id="kpi-net-pnl">$0.00</div>
+        <div class="muted" style="font-size:0.7rem;margin-top:2px;" id="kpi-net-detail">—</div>
+      </div>
+      <div class="stat" id="kpi-realized-stat">
+        <div class="label" style="display:flex;align-items:center;gap:0.3rem;">
+          P&amp;L Realizada (acciones)
+          <span class="info-tooltip" data-tip="Ganancia o pérdida ya materializada por ventas de acciones. Ejemplo: compraste WMT a $119, vendiste a $116 → P&L = -$300." style="cursor:help;color:var(--muted);font-size:0.9rem;">ⓘ</span>
+        </div>
+        <div class="value" id="kpi-realized">$0.00</div>
       </div>
     </div>
   </section>
@@ -539,6 +602,151 @@
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+    </details>
+  </section>
+
+
+  <!-- ═══════════ GLOSARIO ═══════════ -->
+  <section class="panel">
+    <details id="glosario-details">
+      <summary>📖 Glosario — Qué significa cada dato</summary>
+      <div style="margin-top:1rem;">
+        <div class="muted" style="margin-bottom:1rem;font-size:0.82rem;">
+          Definición de cada columna y métrica del dashboard. Diseñado para que cualquier persona entienda qué está viendo y qué decisión implica.
+        </div>
+        <div class="glosario-grid">
+
+          <div class="glosario-item">
+            <div class="glosario-term">Primas Netas Cobradas</div>
+            <div class="glosario-def">Dinero recibido por vender opciones (puts y calls). Es el ingreso principal de la estrategia The Wheel. Se reduce si recompraste una opción para cerrarla anticipadamente.</div>
+            <div class="glosario-example">Ejemplo: Vendiste 1 put de BAC a $0.48 → recibiste $48. Si lo recompraste a $0.20 → prima neta = $28.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">P&amp;L Realizada (acciones)</div>
+            <div class="glosario-def">Ganancia o pérdida ya materializada al vender acciones. Puede ser positiva (vendiste más caro de lo que compraste) o negativa (como WMT: compraste a $119, vendiste a $116).</div>
+            <div class="glosario-example">Ejemplo WMT: Compra a $119 × 100 = $11,900. Venta a $116 × 100 = $11,600. P&L = -$300.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">P&amp;L Neto Total</div>
+            <div class="glosario-def">El resultado real de toda tu actividad: Primas cobradas + P&L por ventas + Dividendos. Este es el número que importa — refleja si la estrategia está siendo rentable en conjunto.</div>
+            <div class="glosario-example">Ejemplo: Primas $2,400 + Dividendos $120 - Pérdida WMT $300 = P&L Neto $2,220.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">P&amp;L No Realizada</div>
+            <div class="glosario-def">Ganancia o pérdida potencial de acciones que aún tienes en cartera, calculada contra el precio actual. No es dinero real hasta que vendas.</div>
+            <div class="glosario-example">Ejemplo: Tienes FCX con costo real de $65, precio actual $69.71 → P&L no realizada = +$471 por 100 acciones.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Costo Bruto</div>
+            <div class="glosario-def">Lo que pagaste realmente por las acciones (incluyendo las que entraron por asignación de puts). No incluye ningún ajuste por primas cobradas.</div>
+            <div class="glosario-example">Ejemplo: 100 acciones de BAC asignadas a $45 → Costo Bruto = $4,500.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Costo Real Ajustado</div>
+            <div class="glosario-def">El costo bruto menos todas las primas cobradas y dividendos recibidos. Representa cuánto dinero realmente has invertido neto en esa posición.</div>
+            <div class="glosario-example">Ejemplo: Costo Bruto $4,500 - Primas $480 - Dividendos $60 = Costo Real Ajustado $3,960.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Costo Real / Acción</div>
+            <div class="glosario-def">El costo real ajustado dividido entre el número de acciones. Es el precio de breakeven real: si el precio actual supera este número, estás en ganancia.</div>
+            <div class="glosario-example">Ejemplo: Costo real ajustado $3,960 ÷ 100 acciones = $39.60/acción. Si BAC cotiza a $45, tienes +$5.40/acción de ganancia latente.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Strike</div>
+            <div class="glosario-def">El precio al que acordaste comprar (put) o vender (call) las acciones si la opción se ejerce. Para puts, es el precio máximo que pagarías por las acciones.</div>
+            <div class="glosario-example">Ejemplo: Vendiste un put con strike $45 sobre BAC. Si BAC cae a $42, te asignan 100 acciones a $45/u.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">DTE (Días al Vencimiento)</div>
+            <div class="glosario-def">Días que quedan para que expire la opción. A 0 DTE, la opción expira: si está OTM, expira sin valor y cobras la prima completa. Si está ITM, te asignan.</div>
+            <div class="glosario-example">Ejemplo: Vendiste el lunes un put con vencimiento viernes → DTE = 4 días.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">ITM / ATM / OTM</div>
+            <div class="glosario-def"><strong>ITM (In The Money)</strong>: la opción tiene valor intrínseco — riesgo de asignación. <strong>ATM</strong>: precio ≈ strike. <strong>OTM (Out of The Money)</strong>: sin valor intrínseco — lo más probable es que expire sin valor.</div>
+            <div class="glosario-example">PUT con strike $45: si BAC cotiza a $42 → ITM (riesgo). Si cotiza a $48 → OTM (seguro).</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Rentabilidad Anualizada</div>
+            <div class="glosario-def">Cuánto rendirías en un año si repitieras esta operación continuamente. Se calcula como (prima/capital) ÷ días × 365. Útil para comparar operaciones de distinta duración.</div>
+            <div class="glosario-example">Ejemplo: Prima $48, capital $4,500, DTE 11 días → ROI anualizado = ($48/$4,500)/11×365 = 35.4%.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Asignación</div>
+            <div class="glosario-def">Cuando el comprador ejerce la opción y debes cumplir tu obligación: comprar las acciones (put asignado) o venderlas (call asignado). En The Wheel, la asignación es parte del plan — solo opera empresas donde quieras ser accionista.</div>
+            <div class="glosario-example">Ejemplo: Vendiste put de WMT strike $119. WMT cae a $115 → te asignan 100 acciones a $119/u. Siguiente paso: vender covered calls.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Covered Call</div>
+            <div class="glosario-def">Venta de una opción call sobre acciones que ya posees. Cobras una prima adicional. Si el precio sube por encima del strike, te "llaman" las acciones (las vendes al strike acordado).</div>
+            <div class="glosario-example">Ejemplo: Tienes 100 acciones de WMT a $119. Vendes call strike $122, cobras $0.80 → $80 de prima. Si WMT llega a $123, vendes a $122.</div>
+          </div>
+
+          <div class="glosario-item">
+            <div class="glosario-term">Buffer Bajista</div>
+            <div class="glosario-def">Cuánto puede caer la acción antes de que pierdas dinero, después de descontar la prima cobrada. Cuanto mayor, más protegida está tu posición.</div>
+            <div class="glosario-example">Ejemplo: Acción a $50, strike $48, prima $0.80. Costo real = $48 - $0.80 = $47.20. Buffer = ($50-$47.20)/$50 = 5.6%.</div>
+          </div>
+
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ═══════════ COVERED CALL AUTOMÁTICO ═══════════ -->
+  <section class="panel" id="cc-auto-section" style="display:none;">
+    <h2>📲 Sugerencia de Covered Call — Posiciones Asignadas</h2>
+    <div class="muted" style="margin-bottom:0.8rem;font-size:0.8rem;">
+      Para cada posición donde tienes acciones sin covered call activo, el dashboard calcula el strike y vencimiento sugerido basado en tu costo real.
+    </div>
+    <div id="cc-suggestions-grid" class="wheel-grid"></div>
+  </section>
+
+
+  <!-- ═══════════ SCREENER DE VALOR ═══════════ -->
+  <section class="panel">
+    <details id="screener-details">
+      <summary>🔍 Screener de Valor — Empresas con Descuento (tipo Buffett)</summary>
+      <div style="margin-top:1rem;">
+        <div class="muted" style="margin-bottom:0.8rem;font-size:0.82rem;">
+          Ingresa una lista de tickers separados por coma. El screener consulta Yahoo Finance y filtra por criterios de valor: P/E bajo, ROE alto, dividendo, y crecimiento consistente. Las empresas que califican son buenos candidatos para The Wheel — si te asignan, estarías comprando valor real con descuento.
+        </div>
+        <div class="screener-controls">
+          <label style="flex:1;min-width:200px;">
+            Tickers (separados por coma)
+            <input type="text" id="screener-tickers" placeholder="BAC,KO,PFE,CVS,FCX" style="width:100%;">
+          </label>
+          <label>P/E máximo
+            <input type="number" id="screener-pe" value="20" min="1" max="100">
+          </label>
+          <label>ROE mínimo (%)
+            <input type="number" id="screener-roe" value="10" min="0" max="100">
+          </label>
+          <label>Div. mínimo (%)
+            <input type="number" id="screener-div" value="0" min="0" step="0.5">
+          </label>
+          <button type="button" id="screener-run" style="align-self:flex-end;">
+            🔍 Analizar
+          </button>
+        </div>
+        <div id="screener-status" class="muted" style="font-size:0.78rem;margin-bottom:0.5rem;"></div>
+        <div id="screener-results"></div>
+        <div class="muted" style="font-size:0.72rem;margin-top:0.8rem;">
+          ⓘ Los datos se obtienen en tiempo real via Yahoo Finance (a través de un proxy CORS público). Úsalos como punto de partida, no como asesoría financiera. Verifica siempre en tu bróker antes de operar.
+        </div>
       </div>
     </details>
   </section>
@@ -829,7 +1037,9 @@ function aggregate() {
   const tickers = {};   // underlying -> {shares, costGross, premium, dividends, fees, realized, openOptions[], hasOptionHistory}
   const ensure = (t) => {
     if (!tickers[t]) tickers[t] = {
-      ticker:t, shares:0, costGross:0, premium:0, dividends:0, fees:0,
+      ticker:t, shares:0, costGross:0,
+      costGrossRaw:0,   // solo compras brutas, sin ajuste de primas — para avgCost real
+      premium:0, dividends:0, fees:0,
       realizedPL:0, openOptions:[], hasOptionHistory:false
     };
     return tickers[t];
@@ -901,11 +1111,11 @@ function aggregate() {
         t.openOptions = t.openOptions.filter(l=>l.contracts>0);
         const sharesAffected = (contracts || 1) * 100;
         if (opt.type==='C') {
-          // Record realized P&L for the call assignment
+          // Record realized P&L for the call assignment — usar costo raw real
           if (t.shares > 0) {
-            const avgCost = t.costGross / t.shares;
+            const avgCostRaw = t.costGrossRaw > 0 ? t.costGrossRaw / t.shares : t.costGross / t.shares;
             const sold = Math.min(sharesAffected, t.shares);
-            t.realizedPL += sold * (opt.strike - avgCost);
+            t.realizedPL += sold * (opt.strike - avgCostRaw);
           }
           // Flag so the paired Sell transaction skips P&L recalculation (already done above)
           t._pendingAssignedSell = (t._pendingAssignedSell || 0) + sharesAffected;
@@ -928,13 +1138,14 @@ function aggregate() {
         const pendingBuy = t._pendingAssignedBuy || 0;
         if (action==='buy' && pendingBuy >= qty) {
           // This is the Schwab "Buy" paired with a PUT Assigned
-          // Process normally — shares and cost ARE needed, just don't double-count
           t._pendingAssignedBuy -= qty;
-          t.shares    += qty;
-          t.costGross += Math.abs(amount);
+          t.shares        += qty;
+          t.costGross     += Math.abs(amount);
+          t.costGrossRaw  += Math.abs(amount); // track raw purchase cost
         } else {
-          t.shares    += qty;
-          t.costGross += Math.abs(amount);
+          t.shares        += qty;
+          t.costGross     += Math.abs(amount);
+          t.costGrossRaw  += Math.abs(amount);
         }
       } else if (action==='sell') {
         const qty = Math.abs(tx.quantity);
@@ -949,13 +1160,19 @@ function aggregate() {
             t.shares    -= sold;
           }
         } else {
-          // Regular sell
+          // Regular sell — usar costGrossRaw para avgCost real (no ajustado por primas)
+          // Esto asegura que pérdidas como WMT comprado a $119 y vendido a $116
+          // se reflejen correctamente: P&L = (116-119)*100 = -$300
           if (t.shares > 0) {
-            const avgCost = t.costGross / t.shares;
-            const sold = Math.min(qty, t.shares);
-            t.realizedPL += sold * ((Math.abs(amount)/qty) - avgCost);
-            t.costGross  -= sold * avgCost;
-            t.shares     -= sold;
+            const avgCostRaw = t.costGrossRaw > 0 ? t.costGrossRaw / t.shares : t.costGross / t.shares;
+            const sold       = Math.min(qty, t.shares);
+            const salePrice  = Math.abs(amount) / qty;
+            t.realizedPL    += sold * (salePrice - avgCostRaw);
+            // Reducir ambos trackers proporcionalmente
+            const rawFraction = t.costGrossRaw > 0 ? (sold / t.shares) : 0;
+            t.costGross     -= sold * (t.costGross / t.shares);
+            t.costGrossRaw  -= rawFraction * t.costGrossRaw;
+            t.shares        -= sold;
           }
         }
       } else if (
@@ -998,6 +1215,7 @@ function recompute() {
   renderHistory();
   renderWheel(tickers);
   renderPremiumChart();
+  renderCCSuggestions(tickers);
 }
 
 // ----- Wheel Tracker + Detail Modal -----
@@ -1400,6 +1618,15 @@ function renderKPIs(tickers) {
       }
     }
   }
+  // P&L Realizada y Neto Total
+  let totalRealized = 0;
+  let totalDividends = 0;
+  for (const t of arr) {
+    totalRealized  += t.realizedPL || 0;
+    totalDividends += t.dividends  || 0;
+  }
+  const netPnl = totalPremium + totalRealized + totalDividends;
+
   document.getElementById('kpi-premium').textContent = fmtMoney(totalPremium);
   document.getElementById('kpi-premium-month').textContent = fmtMoney(rangePremium);
   const detail = document.getElementById('kpi-premium-range-detail');
@@ -1407,6 +1634,26 @@ function renderKPIs(tickers) {
   document.getElementById('kpi-open-options').textContent = openCount;
   document.getElementById('kpi-itm').textContent = itmCount;
   document.getElementById('kpi-tickers').textContent = tickersWithShares;
+
+  // P&L Neto Total
+  const netEl = document.getElementById('kpi-net-pnl');
+  const netStat = document.getElementById('kpi-net-stat');
+  const netDetail = document.getElementById('kpi-net-detail');
+  if (netEl) {
+    netEl.textContent = fmtMoney(netPnl);
+    netEl.className = 'value ' + (netPnl >= 0 ? 'pos' : 'neg');
+  }
+  if (netStat) netStat.style.borderLeftColor = netPnl >= 0 ? 'var(--green)' : 'var(--red)';
+  if (netDetail) netDetail.textContent = `Primas ${fmtMoney(totalPremium)} + Acciones ${fmtMoney(totalRealized)} + Div ${fmtMoney(totalDividends)}`;
+
+  // P&L Realizada
+  const realEl = document.getElementById('kpi-realized');
+  const realStat = document.getElementById('kpi-realized-stat');
+  if (realEl) {
+    realEl.textContent = fmtMoney(totalRealized);
+    realEl.className = 'value ' + (totalRealized >= 0 ? 'pos' : 'neg');
+  }
+  if (realStat) realStat.style.borderLeftColor = totalRealized >= 0 ? 'var(--green)' : 'var(--red)';
   const rawTime = state.pricesTime;
   let prettyTime = '—';
   if (rawTime) {
@@ -1838,6 +2085,197 @@ function openBulkPriceDialog() {
   alert(`Precios actualizados manualmente: ${updated} tickers.`);
 }
 
+// ----- Covered Call Suggestions -----
+function renderCCSuggestions(tickers) {
+  const section = document.getElementById('cc-auto-section');
+  const grid    = document.getElementById('cc-suggestions-grid');
+  if (!section || !grid) return;
+
+  // Solo mostrar tickers con acciones asignadas y SIN covered call activo
+  const candidates = Object.values(tickers).filter(t => {
+    const hasShares = t.shares >= 1;
+    const openCalls = t.openOptions.filter(o => o.type === 'C');
+    return hasShares && openCalls.length === 0 && t.hasOptionHistory;
+  });
+
+  section.style.display = candidates.length > 0 ? 'block' : 'none';
+  grid.innerHTML = '';
+
+  for (const t of candidates) {
+    const px       = state.prices[t.ticker] || 0;
+    const avgCostRaw = t.costGrossRaw > 0 ? t.costGrossRaw / t.shares : t.costGross / t.shares;
+    const realCost = (t.costGross - t.premium - t.dividends) / t.shares;
+    const shares   = Math.floor(t.shares / 100) * 100; // múltiplos de 100
+    const contracts = shares / 100;
+
+    // Sugerir strike CC: precio actual + 3-5% para capturar prima sin sacrificar ganancia
+    // Prioridad: strike > costo bruto promedio (no vender por debajo de lo pagado)
+    const strikeBase   = Math.max(px * 1.03, avgCostRaw * 1.01);
+    const strikeSug    = Math.ceil(strikeBase * 2) / 2; // redondear al 0.5 más cercano
+    const bufferPct    = px > 0 ? ((strikeSug - px) / px * 100).toFixed(1) : '—';
+    const pnlIfCalled  = shares * (strikeSug - avgCostRaw);
+    const premiumEst   = px * 0.008 * contracts * 100; // estimado ~0.8% del precio, 14 días
+
+    // Next friday ~14 days out
+    const today = new Date();
+    const daysToFri = (5 - today.getDay() + 14) % 7 + 7;
+    const expDate = new Date(today);
+    expDate.setDate(today.getDate() + daysToFri + (daysToFri < 7 ? 7 : 0));
+    const expStr = expDate.toISOString().slice(0, 10);
+
+    const card = document.createElement('div');
+    card.className = 'wheel-card';
+    card.innerHTML = `
+      <h3>
+        <span style="font-size:1.1rem;">📲</span>
+        <strong>${t.ticker}</strong>
+        <span style="color:var(--muted);font-size:0.78rem;font-weight:400;">${shares} acciones</span>
+      </h3>
+      <div class="cc-suggest">
+        <h4>💡 Covered Call Sugerido</h4>
+        <div class="cc-grid">
+          <div class="cc-item">
+            <div class="cc-label">Strike Sugerido</div>
+            <div class="cc-val">$${strikeSug.toFixed(2)}</div>
+          </div>
+          <div class="cc-item">
+            <div class="cc-label">Vencimiento</div>
+            <div class="cc-val">${expStr}</div>
+          </div>
+          <div class="cc-item">
+            <div class="cc-label">Prima Est.</div>
+            <div class="cc-val pos">~$${premiumEst.toFixed(0)}</div>
+          </div>
+          <div class="cc-item">
+            <div class="cc-label">Upside si te llaman</div>
+            <div class="cc-val ${pnlIfCalled >= 0 ? 'pos' : 'neg'}">${fmtMoney(pnlIfCalled)}</div>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.5rem;">
+          Strike ${bufferPct}% sobre precio actual ($${px ? px.toFixed(2) : '—'}).
+          Costo promedio real: $${avgCostRaw.toFixed(2)}/acc.
+          ${pnlIfCalled >= 0 ? '✅ Strike por encima de costo — no hay riesgo de vender con pérdida.' : '⚠️ Strike por debajo del costo bruto — considera subir el strike.'}
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+// ----- Value Screener -----
+function setupScreener() {
+  const btn = document.getElementById('screener-run');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const raw     = (document.getElementById('screener-tickers').value || '').toUpperCase();
+    const maxPE   = parseFloat(document.getElementById('screener-pe').value) || 20;
+    const minROE  = parseFloat(document.getElementById('screener-roe').value) / 100 || 0.10;
+    const minDiv  = parseFloat(document.getElementById('screener-div').value) / 100 || 0;
+
+    const tickers = raw.split(/[,\s]+/).map(t => t.trim().toUpperCase()).filter(Boolean);
+    if (!tickers.length) { alert('Ingresa al menos un ticker.'); return; }
+
+    const status  = document.getElementById('screener-status');
+    const results = document.getElementById('screener-results');
+    status.textContent  = `Analizando ${tickers.length} tickers via Yahoo Finance…`;
+    results.innerHTML   = '';
+    btn.disabled        = true;
+
+    const qualified = [];
+
+    for (const tk of tickers) {
+      status.textContent = `Consultando ${tk}…`;
+      try {
+        // Yahoo Finance via allorigins proxy
+        const url = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + tk + '?interval=1d&range=1d')}`;
+        const summaryUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v10/finance/quoteSummary/' + tk + '?modules=defaultKeyStatistics,summaryDetail,financialData')}`;
+
+        const resp = await fetch(summaryUrl, { signal: AbortSignal.timeout(8000) });
+        const data = await resp.json();
+
+        const fin  = data?.quoteSummary?.result?.[0]?.financialData || {};
+        const stat = data?.quoteSummary?.result?.[0]?.defaultKeyStatistics || {};
+        const summ = data?.quoteSummary?.result?.[0]?.summaryDetail || {};
+
+        const price     = fin.currentPrice?.raw || summ.regularMarketPrice?.raw || 0;
+        const pe        = summ.trailingPE?.raw || stat.forwardPE?.raw || 0;
+        const roe       = fin.returnOnEquity?.raw || 0;
+        const div       = summ.dividendYield?.raw || 0;
+        const eps       = fin.epsCurrentYear?.raw || stat.trailingEps?.raw || 0;
+        const debtEq    = fin.debtToEquity?.raw || 0;
+        const fcf       = fin.freeCashflow?.raw || 0;
+        const name      = fin.companyOfficers?.[0] ? tk : tk;
+
+        // Filtros de valor
+        const peOk  = pe > 0 && pe <= maxPE;
+        const roeOk = roe >= minROE;
+        const divOk = div >= minDiv;
+
+        // Score de valor (0-100)
+        const peScore  = pe > 0 ? Math.max(0, (1 - pe / (maxPE * 2)) * 40) : 0;
+        const roeScore = Math.min(roe / 0.30, 1.0) * 35;
+        const divScore = Math.min(div / 0.06, 1.0) * 15;
+        const fcfScore = fcf > 0 ? 10 : 0;
+        const vScore   = Math.round(peScore + roeScore + divScore + fcfScore);
+
+        if (peOk || roeOk) { // al menos un criterio
+          qualified.push({
+            ticker: tk, price, pe, roe, div, eps, debtEq, fcf, vScore,
+            peOk, roeOk, divOk,
+            allOk: peOk && roeOk && divOk,
+          });
+        }
+      } catch(e) {
+        console.warn(`Screener: ${tk} error: ${e.message}`);
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    btn.disabled = false;
+    qualified.sort((a, b) => b.vScore - a.vScore);
+
+    if (!qualified.length) {
+      status.textContent = `Ningún ticker pasó los filtros con los criterios actuales.`;
+      return;
+    }
+
+    status.textContent = `${qualified.length} de ${tickers.length} tickers califican. Ordenados por score de valor:`;
+
+    for (const q of qualified) {
+      const div = document.createElement('div');
+      div.className = 'screener-result';
+      const fmtPct = v => v ? (v*100).toFixed(1)+'%' : '—';
+      const fmtNum = v => v ? v.toFixed(1) : '—';
+      const fmtFcf = v => !v ? '—' : v >= 1e9 ? '$'+(v/1e9).toFixed(1)+'B' : '$'+(v/1e6).toFixed(0)+'M';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <span class="sr-ticker">${q.ticker}</span>
+            <span style="background:${q.allOk?'var(--green)':q.vScore>50?'var(--yellow)':'var(--muted)'};color:#0f172a;font-size:0.68rem;padding:1px 7px;border-radius:8px;font-weight:700;margin-left:0.4rem;">Score ${q.vScore}</span>
+          </div>
+          <span style="font-size:0.85rem;font-weight:700;">${q.price ? '$'+q.price.toFixed(2) : '—'}</span>
+        </div>
+        <div class="sr-metrics">
+          <span class="sr-pill ${q.peOk?'good':'warn'}">P/E ${fmtNum(q.pe)}</span>
+          <span class="sr-pill ${q.roeOk?'good':'warn'}">ROE ${fmtPct(q.roe)}</span>
+          <span class="sr-pill ${q.divOk?'good':''}">Div ${fmtPct(q.div)}</span>
+          <span class="sr-pill">EPS $${q.eps ? q.eps.toFixed(2) : '—'}</span>
+          <span class="sr-pill">D/E ${q.debtEq ? (q.debtEq/100).toFixed(1)+'x' : '—'}</span>
+          <span class="sr-pill">FCF ${fmtFcf(q.fcf)}</span>
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">
+          ${q.allOk ? '✅ Cumple todos los criterios — buen candidato para The Wheel' : 
+            q.vScore > 50 ? '⚡ Criterios parciales — revisar antes de operar' :
+            '⚠️ No cumple todos los filtros — considerar con cautela'}
+        </div>
+      `;
+      results.appendChild(div);
+    }
+  });
+}
+
+
 // ----- Wiring -----
 document.getElementById('csv-input').addEventListener('change', e => {
   if (e.target.files.length) handleFiles(e.target.files);
@@ -2253,6 +2691,7 @@ if (getSheetsUrl() && getProfile()) {
 
 setupManualForm();
 setupSimulator();
+setupScreener();
 
 // Wire chart controls
 ['chart-group','chart-periods'].forEach(id => {
