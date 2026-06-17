@@ -220,6 +220,15 @@
     white-space:normal; width:220px; z-index:100; pointer-events:none;
   }
 
+  /* ---- Scenario Toggle ---- */
+  .scenario-toggle { display:flex; gap:0; background:var(--panel-2);
+    border-radius:8px; padding:3px; border:1px solid var(--border); }
+  .scenario-btn { padding:0.3rem 1rem; border-radius:6px; font-size:0.78rem;
+    cursor:pointer; border:none; background:transparent;
+    color:var(--muted); transition:all .15s; font-weight:500; }
+  .scenario-btn.active { background:var(--accent); color:#0f172a; font-weight:700; }
+  .scenario-desc { font-size:0.72rem; color:var(--muted); margin-top:0.4rem; }
+
   /* ---- LP Toggle ---- */
   .lp-badge { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.68rem;
     padding:2px 7px; border-radius:10px; cursor:pointer; user-select:none;
@@ -524,14 +533,25 @@
   <!-- ══ ROI POR PERÍODO ══ -->
   <section class="panel roi-panel">
     <div class="roi-panel-header">
-      <h2>📈 Rentabilidad del Capital</h2>
-      <div class="roi-period-tabs">
-        <button class="roi-tab active" data-period="7">7 días</button>
-        <button class="roi-tab" data-period="30">30 días</button>
-        <button class="roi-tab" data-period="90">90 días</button>
-        <button class="roi-tab" data-period="180">180 días</button>
-        <button class="roi-tab" data-period="ytd">YTD</button>
-        <button class="roi-tab" data-period="all">Todo</button>
+      <div>
+        <h2>📈 Rentabilidad del Capital</h2>
+        <div class="scenario-desc" id="scenario-desc">
+          Primas + Dividendos + P&amp;L Realizada (sin movimiento del mercado)
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;align-items:flex-end;">
+        <div class="scenario-toggle">
+          <button class="scenario-btn active" data-scenario="ops">⚙ Operacional</button>
+          <button class="scenario-btn" data-scenario="total">🌐 Total (con mercado)</button>
+        </div>
+        <div class="roi-period-tabs">
+          <button class="roi-tab active" data-period="7">7 días</button>
+          <button class="roi-tab" data-period="30">30 días</button>
+          <button class="roi-tab" data-period="90">90 días</button>
+          <button class="roi-tab" data-period="180">180 días</button>
+          <button class="roi-tab" data-period="ytd">YTD</button>
+          <button class="roi-tab" data-period="all">Todo</button>
+        </div>
       </div>
     </div>
     <div class="roi-metrics" id="roi-metrics-grid">
@@ -541,14 +561,14 @@
         <div class="roi-metric-sub" id="roi-capital-detail">— acciones + — puts</div>
       </div>
       <div class="roi-metric" id="roi-metric-pct">
-        <div class="roi-metric-label">ROI del Período <span class="info-tip" data-tip="(Primas + Dividendos + P&L Realizada + P&L No Realizada del período) / Capital Comprometido del período.">ⓘ</span></div>
+        <div class="roi-metric-label">ROI del Período <span class="info-tip" data-tip="★ ROI Operacional: (Primas + Dividendos + P&L Realizada) / Capital Comprometido. Mide el ingreso real generado por The Wheel, sin incluir el movimiento del precio del mercado.">ⓘ</span></div>
         <div class="roi-metric-value" id="roi-pct">0.00%</div>
         <div class="roi-metric-sub" id="roi-period-label">últimos 7 días</div>
       </div>
       <div class="roi-metric" id="roi-metric-ann">
         <div class="roi-metric-label">ROI Anualizado</div>
         <div class="roi-metric-value" id="roi-ann">0.00%</div>
-        <div class="roi-metric-sub">extrapolado al año</div>
+        <div class="roi-metric-sub" id="roi-ann-sub">operacional × 365/días</div>
       </div>
       <div class="roi-metric green">
         <div class="roi-metric-label">P&amp;L No Realizada <span class="info-tip" data-tip="Ganancia o pérdida potencial de acciones en cartera vs precio actual. No es dinero real hasta que vendas.">ⓘ</span></div>
@@ -568,6 +588,10 @@
       <div class="roi-breakdown-item">P&amp;L no realizada: <span id="rb-unrealized">$0</span></div>
       <div class="roi-breakdown-item">Capital acciones: <span id="rb-cap-stocks">$0</span></div>
       <div class="roi-breakdown-item">Capital puts: <span id="rb-cap-puts">$0</span></div>
+      <div class="roi-breakdown-item" style="border-top:1px solid var(--border);padding-top:0.4rem;margin-top:0.2rem;">
+        ★ Resultado neto operacional: <span id="rb-net-result">$0</span>
+        <span class="info-tip" data-tip="Primas + Dividendos + P&L Realizada del período. Este es el ingreso real del ejercicio Wheel, sin contar el movimiento del mercado.">ⓘ</span>
+      </div>
     </div>
   </section>
 
@@ -622,6 +646,7 @@
             <th>Precio Actual</th>
             <th>P&amp;L No Realizada</th>
             <th>P&amp;L Realizada</th>
+            <th>★ Resultado Neto <span class="info-tip" data-tip="Primas cobradas + P&L Realizada + Dividendos. Es el resultado real del ciclo Wheel para este ticker, independiente del precio actual de la acción.">ⓘ</span></th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -1685,6 +1710,9 @@ function renderPositions(tickers) {
       <td>${px ? '$'+px.toFixed(2) : '<span class="muted">—</span>'}</td>
       <td class="${unrealized>=0?'pos':'neg'}">${unrealized!==null ? fmtMoney(unrealized) : '—'}</td>
       <td class="${t.realizedPL>=0?'pos':'neg'}">${fmtMoney(t.realizedPL)}</td>
+      <td class="${(t.premium+t.realizedPL+t.dividends)>=0?'pos':'neg'}" style="font-weight:700;">
+        ${fmtMoney(t.premium + t.realizedPL + t.dividends)}
+      </td>
     `;
     tbody.appendChild(tr);
   }
@@ -2138,19 +2166,51 @@ function calcROI(tickers, period) {
     }
   }
 
-  const periodReturn = periodPremium + periodDividends + periodRealized + unrealized;
-  const roi    = capTotal > 0 ? (periodReturn / capTotal) * 100 : 0;
-  const roiAnn = days   > 0  ? roi * (365 / days)               : 0;
+  // Resultado neto operacional del período (lo que genera The Wheel):
+  //   Primas + Dividendos + P&L Realizada
+  // Estos tres son los ingresos reales del ejercicio — independientes
+  // del precio del mercado en un momento dado
+  const periodNetResult = periodPremium + periodDividends + periodRealized;
+
+  // Retorno total incluye además el movimiento del mercado (no realizado)
+  const periodReturn = periodNetResult + unrealized;
+
+  // ROI operacional — solo ingresos del ejercicio / capital comprometido
+  const roiOps    = capTotal > 0 ? (periodNetResult / capTotal) * 100 : 0;
+  // ROI total — incluyendo movimiento del mercado
+  const roi       = capTotal > 0 ? (periodReturn    / capTotal) * 100 : 0;
+  const roiAnn    = days     > 0 ? roi    * (365 / days) : 0;
+  const roiOpsAnn = days     > 0 ? roiOps * (365 / days) : 0;
 
   return {
     capTotal, capStocks, capPuts,
     unrealized, periodPremium, periodDividends, periodRealized,
-    periodReturn, roi, roiAnn, days,
+    periodNetResult, periodReturn,
+    roi, roiAnn, roiOps, roiOpsAnn, days,
   };
 }
 
+let _roiScenario = 'ops'; // 'ops' = operacional, 'total' = con mercado
+
 function renderROI(tickers, period) {
   const r = calcROI(tickers, period);
+
+  // Seleccionar valores según escenario activo
+  const isTotal  = _roiScenario === 'total';
+  const roiVal   = isTotal ? r.roi    : r.roiOps;
+  const roiAnnV  = isTotal ? r.roiAnn : r.roiOpsAnn;
+  const retorno  = isTotal ? r.periodReturn : r.periodNetResult;
+
+  // Descripción del escenario
+  const descEl = document.getElementById('scenario-desc');
+  if (descEl) descEl.textContent = isTotal
+    ? 'Primas + Dividendos + P&L Realizada + P&L No Realizada (movimiento del mercado incluido)'
+    : 'Primas + Dividendos + P&L Realizada (sin movimiento del mercado)';
+
+  const annSubEl = document.getElementById('roi-ann-sub');
+  if (annSubEl) annSubEl.textContent = isTotal
+    ? 'total × 365/días'
+    : 'operacional × 365/días';
 
   // Capital comprometido
   const capEl = document.getElementById('roi-capital');
@@ -2159,39 +2219,47 @@ function renderROI(tickers, period) {
   if (capDet) capDet.textContent =
     `Acciones ${fmtMoney(r.capStocks)} + Puts ${fmtMoney(r.capPuts)}`;
 
-  // ROI período
+  // ROI del período
   const roiEl  = document.getElementById('roi-pct');
   const roiAnn = document.getElementById('roi-ann');
   const roiLbl = document.getElementById('roi-period-label');
   const roiM   = document.getElementById('roi-metric-pct');
   const roiMA  = document.getElementById('roi-metric-ann');
   if (roiEl) {
-    roiEl.textContent = r.roi.toFixed(2) + '%';
-    roiEl.className   = 'roi-metric-value ' + (r.roi >= 0 ? 'pos' : 'neg');
+    roiEl.textContent = roiVal.toFixed(2) + '%';
+    roiEl.className   = 'roi-metric-value ' + (roiVal >= 0 ? 'pos' : 'neg');
   }
   if (roiAnn) {
-    roiAnn.textContent = r.roiAnn.toFixed(2) + '%';
-    roiAnn.className   = 'roi-metric-value ' + (r.roiAnn >= 0 ? 'pos' : 'neg');
+    roiAnn.textContent = roiAnnV.toFixed(2) + '%';
+    roiAnn.className   = 'roi-metric-value ' + (roiAnnV >= 0 ? 'pos' : 'neg');
   }
-  if (roiM)  roiM.className  = 'roi-metric ' + (r.roi >= 0 ? 'green' : 'red');
-  if (roiMA) roiMA.className = 'roi-metric ' + (r.roiAnn >= 0 ? 'green' : 'red');
+  if (roiM)  roiM.className  = 'roi-metric ' + (roiVal  >= 0 ? 'green' : 'red');
+  if (roiMA) roiMA.className = 'roi-metric ' + (roiAnnV >= 0 ? 'green' : 'red');
 
   const periodLabels = { '7':'últimos 7 días', '30':'últimos 30 días',
     '90':'últimos 90 días', '180':'últimos 180 días', 'ytd':'año en curso', 'all':'todo el período' };
   if (roiLbl) roiLbl.textContent = periodLabels[String(period)] || '';
 
-  // P&L no realizada
+  // P&L no realizada — siempre visible como información
   const unrEl  = document.getElementById('roi-unrealized');
   const unrDet = document.getElementById('roi-unrealized-detail');
   if (unrEl) {
     unrEl.textContent = fmtMoney(r.unrealized);
     unrEl.className   = 'roi-metric-value ' + (r.unrealized >= 0 ? 'pos' : 'neg');
     const parent = unrEl.closest('.roi-metric');
-    if (parent) parent.className = 'roi-metric ' + (r.unrealized >= 0 ? 'green' : 'red');
+    // En escenario operacional se muestra atenuado — es info, no parte del ROI
+    if (parent) {
+      parent.className = 'roi-metric ' + (r.unrealized >= 0 ? 'green' : 'red');
+      parent.style.opacity = isTotal ? '1' : '0.6';
+      parent.title = isTotal
+        ? 'Incluida en el ROI Total'
+        : 'Informativo — no incluida en el ROI Operacional';
+    }
   }
-  if (unrDet) unrDet.textContent = r.unrealized >= 0
+  if (unrDet) unrDet.textContent = (r.unrealized >= 0
     ? `+${fmtMoney(r.unrealized)} ganancia latente`
-    : `${fmtMoney(r.unrealized)} pérdida latente`;
+    : `${fmtMoney(r.unrealized)} pérdida latente`)
+    + (isTotal ? ' (incluida en ROI)' : ' (no incluida en ROI)');
 
   // Breakdown
   const fmt = (v) => {
@@ -2210,6 +2278,11 @@ function renderROI(tickers, period) {
   setBreakdown('rb-unrealized', r.unrealized);
   setBreakdown('rb-cap-stocks', r.capStocks);
   setBreakdown('rb-cap-puts',   r.capPuts);
+  // Resultado neto operacional
+  const netEl = document.getElementById('rb-net-result');
+  if (netEl) {
+    netEl.innerHTML = `<span class="${r.periodNetResult>=0?'pos':'neg'}" style="font-weight:700">${fmtMoney(r.periodNetResult)}</span>`;
+  }
 }
 
 // ── LP State (persiste en localStorage) ──────────────────────
@@ -2247,6 +2320,15 @@ function setupROITabs() {
       document.querySelectorAll('.roi-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       _roiPeriod = btn.dataset.period;
+      const tickers = aggregate();
+      renderROI(tickers, _roiPeriod);
+    });
+  });
+  document.querySelectorAll('.scenario-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _roiScenario = btn.dataset.scenario;
       const tickers = aggregate();
       renderROI(tickers, _roiPeriod);
     });
