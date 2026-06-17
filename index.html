@@ -2440,7 +2440,7 @@ function setupROITabs() {
   if (btnHist) {
     btnHist.addEventListener('click', async () => {
       const sheetsUrl = getSheetsUrl();
-      const profile   = getSheetsProfile ? getSheetsProfile() : 'DISA';
+      const profile   = getProfile() || 'DISA';
       if (!sheetsUrl) {
         alert('Configura la URL de Google Sheets en el panel de Ajustes del dashboard.');
         return;
