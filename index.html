@@ -1571,6 +1571,8 @@ function renderRoi(tickers) {
       }
     }
   }
+  const periodTotal = periodPremium + periodDividends + periodRealized + (includeUnrealized ? unrealizedToday : 0);
+
   window.__roiBreakdown = {
     ...roiBreakdown,
     range,
@@ -1578,8 +1580,6 @@ function renderRoi(tickers) {
     premiumTxs, dividendTxs, realizedByTicker
   };
 
-  const periodTotal = periodPremium + periodDividends + periodRealized + (includeUnrealized ? unrealizedToday : 0);
-  window.__roiBreakdown.periodTotal = periodTotal;
   const roiPct = capitalBase > 0 ? (periodTotal / capitalBase * 100) : 0;
   const annualFactor = range.days ? (365 / range.days) : null;
   const roiAnnual = annualFactor !== null ? roiPct * annualFactor : null;
