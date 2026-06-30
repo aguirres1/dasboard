@@ -164,7 +164,15 @@
   .dte-urgent { color: var(--red); font-weight: 700; }
   .dte-warn { color: var(--yellow); font-weight: 600; }
 
-  /* ---- Google Sheets sync ---- */
+  /* ---- KPI Tooltips ---- */
+  .kpi-label { display:flex; align-items:center; gap:5px; }
+  .kpi-info { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:var(--panel-2); color:var(--muted); font-size:10px; cursor:pointer; border:1px solid var(--border); flex-shrink:0; transition:background 0.15s; }
+  .kpi-info:hover { background:var(--accent); color:#fff; }
+  .kpi-modal { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; padding:1rem; }
+  .kpi-modal-box { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:1.5rem; max-width:480px; width:100%; position:relative; }
+  .kpi-modal-box h3 { margin:0 0 0.5rem; color:var(--accent); font-size:1rem; }
+  .kpi-modal-box .formula { background:var(--panel-2); border-radius:6px; padding:0.6rem 0.8rem; font-family:monospace; font-size:0.82rem; color:var(--text); margin:0.7rem 0; }
+  .kpi-modal-close { position:absolute; top:0.8rem; right:0.8rem; background:var(--panel-2); border:none; color:var(--text); width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:0.9rem; }
   .sheets-status { font-size:0.75rem; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; }
   .sheets-status.connected { background:rgba(74,222,128,0.15); color:var(--green); border:1px solid rgba(74,222,128,0.3); }
   .sheets-status.disconnected { background:rgba(148,163,184,0.1); color:var(--muted); border:1px solid var(--border); }
@@ -208,62 +216,6 @@
   .ann-good { color: var(--green); font-weight:600; }
   .ann-ok { color: var(--yellow); }
   .ann-low { color: var(--muted); }
-
-  /* ---- Info tooltips ---- */
-  .info-tip { position:relative; display:inline-block; cursor:help; color:var(--muted); font-size:0.9rem; }
-  .info-tip:hover::after {
-    content: attr(data-tip);
-    position:absolute; left:50%; bottom:calc(100% + 6px);
-    transform:translateX(-50%);
-    background:#0f172a; color:#e2e8f0; border:1px solid #475569;
-    padding:6px 10px; border-radius:6px; font-size:0.72rem; line-height:1.4;
-    white-space:normal; width:220px; z-index:100; pointer-events:none;
-  }
-
-  /* ---- Scenario Toggle ---- */
-  .scenario-toggle { display:flex; gap:0; background:var(--panel-2);
-    border-radius:8px; padding:3px; border:1px solid var(--border); }
-  .scenario-btn { padding:0.3rem 1rem; border-radius:6px; font-size:0.78rem;
-    cursor:pointer; border:none; background:transparent;
-    color:var(--muted); transition:all .15s; font-weight:500; }
-  .scenario-btn.active { background:var(--accent); color:#0f172a; font-weight:700; }
-  .scenario-desc { font-size:0.72rem; color:var(--muted); margin-top:0.4rem; }
-
-  /* ---- LP Toggle ---- */
-  .lp-badge { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.68rem;
-    padding:2px 7px; border-radius:10px; cursor:pointer; user-select:none;
-    transition:all .15s; border:1px solid; font-weight:600; }
-  .lp-badge.is-lp { background:#FEF9EC; color:#92680F; border-color:#F0D780; }
-  .lp-badge.not-lp { background:#EEF7F2; color:#1A6B3C; border-color:#C3E0CE; }
-  .lp-excluded-bar { background:var(--panel-2); border-radius:8px; padding:0.6rem 1rem;
-    margin-bottom:0.8rem; font-size:0.78rem; color:var(--muted);
-    display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
-  .lp-excluded-bar strong { color:var(--text); }
-
-  /* ---- ROI Period Panel ---- */
-  .roi-panel { background:var(--panel); border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:1.5rem; }
-  .roi-panel-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.8rem; margin-bottom:1rem; }
-  .roi-panel-header h2 { font-size:1rem; font-weight:700; color:var(--text); }
-  .roi-period-tabs { display:flex; gap:0.4rem; flex-wrap:wrap; }
-  .roi-tab { background:var(--panel-2); border:1px solid var(--border); color:var(--muted);
-    padding:0.3rem 0.8rem; border-radius:6px; font-size:0.78rem; cursor:pointer; transition:all .15s; }
-  .roi-tab:hover { border-color:var(--accent); color:var(--accent); }
-  .roi-tab.active { background:var(--accent); border-color:var(--accent); color:#0f172a; font-weight:700; }
-  .roi-metrics { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:0.8rem; }
-  .roi-metric { background:var(--panel-2); border-radius:8px; padding:0.8rem 1rem; border-left:3px solid var(--border); }
-  .roi-metric.green { border-left-color:var(--green); }
-  .roi-metric.red   { border-left-color:var(--red); }
-  .roi-metric.blue  { border-left-color:var(--accent); }
-  .roi-metric.gold  { border-left-color:#f59e0b; }
-  .roi-metric-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:0.3rem; }
-  .roi-metric-value { font-size:1.2rem; font-weight:700; font-family:monospace; }
-  .roi-metric-sub   { font-size:0.7rem; color:var(--muted); margin-top:0.2rem; }
-  .roi-breakdown { margin-top:1rem; padding-top:0.8rem; border-top:1px solid var(--border);
-    display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:0.5rem; }
-  .roi-breakdown-item { font-size:0.78rem; color:var(--muted); }
-  .roi-breakdown-item span { font-weight:600; font-family:monospace; }
-  .roi-breakdown-item span.pos { color:var(--green); }
-  .roi-breakdown-item span.neg { color:var(--red); }
 </style>
 </head>
 <body>
@@ -300,12 +252,12 @@
     <h2>Resumen General</h2>
     <div class="grid" id="kpi-grid">
       <div class="stat green">
-        <div class="label">Primas netas cobradas (total)</div>
+        <div class="label kpi-label">Primas netas cobradas (total) <span class="kpi-info" onclick="showKpiInfo('premium-total')">?</span></div>
         <div class="value" id="kpi-premium">$0.00</div>
       </div>
       <div class="stat" style="min-width:240px;">
         <div class="label" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
-          <span>Primas en rango</span>
+          <span class="kpi-label">Primas en rango <span class="kpi-info" onclick="showKpiInfo('premium-range')">?</span></span>
           <select id="premium-range" style="font-size:0.75rem; padding:2px 4px;">
             <option value="7d">Últimos 7 días</option>
             <option value="30d">Últimos 30 días</option>
@@ -328,36 +280,26 @@
         </div>
       </div>
       <div class="stat">
-        <div class="label">Posiciones de opción abiertas</div>
+        <div class="label kpi-label">Posiciones de opción abiertas <span class="kpi-info" onclick="showKpiInfo('open-options')">?</span></div>
         <div class="value" id="kpi-open-options">0</div>
       </div>
       <div class="stat yellow">
-        <div class="label">En riesgo de asignación (ITM)</div>
+        <div class="label kpi-label">En riesgo de asignación (ITM) <span class="kpi-info" onclick="showKpiInfo('itm')">?</span></div>
         <div class="value" id="kpi-itm">0</div>
       </div>
       <div class="stat">
-        <div class="label">Tickers con acciones</div>
+        <div class="label kpi-label">Tickers con acciones <span class="kpi-info" onclick="showKpiInfo('tickers')">?</span></div>
         <div class="value" id="kpi-tickers">0</div>
       </div>
       <div class="stat">
-        <div class="label">Última actualización de precios</div>
+        <div class="label kpi-label">Última actualización de precios <span class="kpi-info" onclick="showKpiInfo('prices-time')">?</span></div>
         <div class="value" id="kpi-prices-time" style="font-size:1rem;">—</div>
         <div class="muted" id="price-status" style="font-size:0.7rem; margin-top:4px;"></div>
       </div>
-      <div class="stat" id="kpi-net-stat" style="border-left-color:#f59e0b;">
-        <div class="label">
-          P&amp;L Neto Total
-          <span class="info-tip" data-tip="Primas cobradas + Ganancias/Pérdidas por ventas de acciones + Dividendos. Resultado real total de la estrategia.">ⓘ</span>
-        </div>
-        <div class="value" id="kpi-net-pnl">$0.00</div>
-        <div class="muted" style="font-size:0.68rem;margin-top:2px;" id="kpi-net-detail">—</div>
-      </div>
-      <div class="stat" id="kpi-realized-stat">
-        <div class="label">
-          P&amp;L Realizada (acciones)
-          <span class="info-tip" data-tip="Ganancia o pérdida ya materializada por ventas de acciones. Ej: WMT comprado a $119, vendido a $116 → -$300.">ⓘ</span>
-        </div>
-        <div class="value" id="kpi-realized">$0.00</div>
+      <div class="stat">
+        <div class="label kpi-label">P&L no realizada (solo la rueda) <span class="kpi-info" onclick="showKpiInfo('wheel-unrealized')">?</span></div>
+        <div class="value" id="kpi-wheel-unrealized">—</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Solo acciones con opciones operadas</div>
       </div>
     </div>
   </section>
@@ -530,79 +472,6 @@
     </details>
   </section>
 
-  <!-- ══ ROI POR PERÍODO ══ -->
-  <section class="panel roi-panel">
-    <div class="roi-panel-header">
-      <div>
-        <h2>📈 Rentabilidad del Capital</h2>
-        <div class="scenario-desc" id="scenario-desc">
-          Primas + Dividendos + P&amp;L Realizada (sin movimiento del mercado)
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:0.5rem;align-items:flex-end;">
-        <div class="scenario-toggle">
-          <button class="scenario-btn active" data-scenario="ops">⚙ Operacional</button>
-          <button class="scenario-btn" data-scenario="total">🌐 Total (con mercado)</button>
-        </div>
-        <div class="roi-period-tabs">
-          <button class="roi-tab active" data-period="7">7 días</button>
-          <button class="roi-tab" data-period="30">30 días</button>
-          <button class="roi-tab" data-period="90">90 días</button>
-          <button class="roi-tab" data-period="180">180 días</button>
-          <button class="roi-tab" data-period="ytd">YTD</button>
-          <button class="roi-tab" data-period="all">Todo</button>
-        </div>
-      </div>
-    </div>
-    <div class="roi-metrics" id="roi-metrics-grid">
-      <div class="roi-metric blue">
-        <div class="roi-metric-label">Capital Comprometido <span class="info-tip" data-tip="Acciones en cartera (costo bruto) + Puts abiertos (strike × contratos × 100 − prima cobrada). Es el capital real en riesgo.">ⓘ</span></div>
-        <div class="roi-metric-value" id="roi-capital">$0</div>
-        <div class="roi-metric-sub" id="roi-capital-detail">— acciones + — puts</div>
-      <div style="margin-top:0.4rem;">
-        <button id="btn-load-hist" style="font-size:0.7rem;padding:3px 8px;border-radius:5px;
-          background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;"
-          title="Carga precios históricos desde Google Sheets para calcular P&L del período con precisión">
-          📅 Cargar precios históricos
-        </button>
-        <span id="hist-status" style="font-size:0.68rem;color:var(--muted);margin-left:0.4rem;"></span>
-      </div>
-      </div>
-      <div class="roi-metric" id="roi-metric-pct">
-        <div class="roi-metric-label">ROI del Período <span class="info-tip" data-tip="★ ROI Operacional: (Primas + Dividendos + P&L Realizada) / Capital Comprometido. Mide el ingreso real generado por The Wheel, sin incluir el movimiento del precio del mercado.">ⓘ</span></div>
-        <div class="roi-metric-value" id="roi-pct">0.00%</div>
-        <div class="roi-metric-sub" id="roi-period-label">últimos 7 días</div>
-      </div>
-      <div class="roi-metric" id="roi-metric-ann">
-        <div class="roi-metric-label">ROI Anualizado</div>
-        <div class="roi-metric-value" id="roi-ann">0.00%</div>
-        <div class="roi-metric-sub" id="roi-ann-sub">operacional × 365/días</div>
-      </div>
-      <div class="roi-metric green">
-        <div class="roi-metric-label">P&amp;L No Realizada <span class="info-tip" data-tip="Ganancia o pérdida potencial de acciones en cartera vs precio actual. No es dinero real hasta que vendas.">ⓘ</span></div>
-        <div class="roi-metric-value" id="roi-unrealized">$0</div>
-        <div class="roi-metric-sub" id="roi-unrealized-detail">vs costo bruto</div>
-      </div>
-    </div>
-    <div class="lp-excluded-bar" id="lp-excluded-bar" style="display:none;">
-      <strong>Excluidos del cálculo (LP):</strong>
-      <span id="lp-excluded-list">—</span>
-      <span style="margin-left:auto;font-size:0.72rem;">Marca/desmarca en la tabla de posiciones →</span>
-    </div>
-    <div class="roi-breakdown" id="roi-breakdown">
-      <div class="roi-breakdown-item">Primas período: <span class="pos" id="rb-premium">$0</span></div>
-      <div class="roi-breakdown-item">Dividendos período: <span class="pos" id="rb-dividends">$0</span></div>
-      <div class="roi-breakdown-item">P&amp;L realizada período: <span id="rb-realized">$0</span></div>
-      <div class="roi-breakdown-item">P&amp;L no realizada: <span id="rb-unrealized">$0</span></div>
-      <div class="roi-breakdown-item">Capital acciones: <span id="rb-cap-stocks">$0</span></div>
-      <div class="roi-breakdown-item">Capital puts: <span id="rb-cap-puts">$0</span></div>
-      <div class="roi-breakdown-item" style="border-top:1px solid var(--border);padding-top:0.4rem;margin-top:0.2rem;">
-        ★ Resultado neto operacional: <span id="rb-net-result">$0</span>
-        <span class="info-tip" data-tip="Primas + Dividendos + P&L Realizada del período. Este es el ingreso real del ejercicio Wheel, sin contar el movimiento del mercado.">ⓘ</span>
-      </div>
-    </div>
-  </section>
-
   <!-- Posiciones de opción abiertas -->
   <section class="panel">
     <h2>Opciones Abiertas (Cortas)</h2>
@@ -637,13 +506,14 @@
         <input type="checkbox" id="positions-show-all">
         <span>Mostrar todas las posiciones (incluir acciones sin opciones operadas)</span>
       </label>
+      <span style="font-size:0.75rem;">· Marca/desmarca la casilla "Rueda" para incluir o excluir manualmente un ticker de los cálculos de la rueda (P&L no realizada, fases, etc.)</span>
     </div>
     <div class="scroll-x">
       <table id="positions-table">
         <thead>
           <tr>
+            <th>Rueda</th>
             <th>Ticker</th>
-            <th>Rol <span class="info-tip" data-tip="WHEEL = capital activo en La Rueda. LP = Long Position, inversión directa excluida del cálculo de rentabilidad. Haz clic para cambiar.">ⓘ</span></th>
             <th>Acciones</th>
             <th>Costo Bruto</th>
             <th>Costo Promedio</th>
@@ -654,7 +524,6 @@
             <th>Precio Actual</th>
             <th>P&amp;L No Realizada</th>
             <th>P&amp;L Realizada</th>
-            <th>★ Resultado Neto <span class="info-tip" data-tip="Primas cobradas + P&L Realizada + Dividendos. Es el resultado real del ciclo Wheel para este ticker, independiente del precio actual de la acción.">ⓘ</span></th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -707,10 +576,9 @@ const PRICES_TIME_KEY = 'cc_dashboard_prices_time_v1';
 
 // ----- State -----
 let state = {
-  transactions:     [],
-  prices:           {},
-  pricesTime:       null,
-  historicalPrices: {},
+  transactions: [],   // raw rows
+  prices: {},         // ticker -> price
+  pricesTime: null,
 };
 
 function loadState() {
@@ -1140,7 +1008,6 @@ function recompute() {
   refreshAccountSelector();
   const tickers = aggregate();
   renderKPIs(tickers);
-  renderROI(tickers, _roiPeriod);
   renderOpenOptions(tickers);
   renderPositions(tickers);
   renderHistory();
@@ -1154,7 +1021,7 @@ function renderWheel(tickers) {
   const empty = document.getElementById('wheel-empty');
   if (!grid) return;
   grid.innerHTML = '';
-  const arr = Object.values(tickers).filter(t => t.hasOptionHistory || t.openOptions.length > 0);
+  const arr = Object.values(tickers).filter(t => isInWheel(t.ticker, t));
   empty.style.display = arr.length ? 'none' : 'block';
 
   for (const t of arr) {
@@ -1177,10 +1044,16 @@ function renderWheel(tickers) {
       { key: 'idle',          label: '✓ Ciclo completo' },
     ];
 
-    const totalPremium  = t.premium;
+    const totalPremium  = t.premium;       // Σ Sell to Open − Σ Buy to Close
+    const dividends     = t.dividends;
+    const realizedPL    = t.realizedPL;    // ganancia/pérdida de acciones ya vendidas o asignadas
     const avgCost       = hasShares ? t.costGross / t.shares : null;
-    const realCost      = hasShares ? (t.costGross - t.premium - t.dividends) / t.shares : null;
-    const unrealized    = px && hasShares ? (px - (realCost ?? avgCost ?? 0)) * displayShares : null;
+    const realCost       = hasShares ? (t.costGross - t.premium - t.dividends) / t.shares : null;
+    // P&L no realizada en acciones que aún tienes: (precio actual - costo real ajustado) x acciones
+    const unrealizedStock = px && hasShares ? (px - (realCost ?? avgCost ?? 0)) * displayShares : null;
+
+    // P&L TOTAL combinado: primas + dividendos + realizada (cierres ya cristalizados) + no realizada en lo que aún tienes
+    const totalPL = totalPremium + dividends + realizedPL + (unrealizedStock ?? 0);
 
     let nextAction = '';
     if (phase === 'sell-put')      nextAction = `Put $${openPuts[0].strike} vence en ${daysUntil(openPuts[0].expiration)}d`;
@@ -1210,22 +1083,37 @@ function renderWheel(tickers) {
         }).join('')}
       </div>
       <div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.5rem;">▶ ${nextAction}</div>
+
+      <!-- P&L TOTAL destacado -->
+      <div style="background:var(--panel-2);border-radius:8px;padding:0.6rem 0.8rem;margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">P&L Total (todo incluido)</span>
+        <span style="font-size:1.05rem;font-weight:700;" class="${totalPL>=0?'pos':'neg'}">${fmtMoney(totalPL)}</span>
+      </div>
+
       <div class="wheel-stat-row">
         <div class="wheel-stat-item" data-field="shares">
           <div class="wlabel">Acciones</div>
           <div class="wval">${hasShares ? displayShares : '—'}</div>
         </div>
         <div class="wheel-stat-item" data-field="premium">
-          <div class="wlabel">Primas cobradas</div>
-          <div class="wval pos">${fmtMoney(totalPremium)}</div>
+          <div class="wlabel">Primas netas</div>
+          <div class="wval ${totalPremium>=0?'pos':'neg'}">${fmtMoney(totalPremium)}</div>
         </div>
+        <div class="wheel-stat-item" data-field="realized">
+          <div class="wlabel">P&L Realizada</div>
+          <div class="wval ${realizedPL>=0?'pos':'neg'}">${fmtMoney(realizedPL)}</div>
+        </div>
+        ${unrealizedStock !== null ? `<div class="wheel-stat-item" data-field="unrealized">
+          <div class="wlabel">P&L No Realizada</div>
+          <div class="wval ${unrealizedStock>=0?'pos':'neg'}">${fmtMoney(unrealizedStock)}</div>
+        </div>` : ''}
         ${realCost !== null ? `<div class="wheel-stat-item" data-field="realcost">
           <div class="wlabel">Costo real/acc</div>
           <div class="wval ${realCost<0?'neg':''}">${fmtMoney(realCost)}</div>
         </div>` : ''}
-        ${unrealized !== null ? `<div class="wheel-stat-item" data-field="unrealized">
-          <div class="wlabel">P&L no realizada</div>
-          <div class="wval ${unrealized>=0?'pos':'neg'}">${fmtMoney(unrealized)}</div>
+        ${dividends !== 0 ? `<div class="wheel-stat-item" data-field="dividends">
+          <div class="wlabel">Dividendos</div>
+          <div class="wval pos">${fmtMoney(dividends)}</div>
         </div>` : ''}
       </div>
     `;
@@ -1523,6 +1411,8 @@ function renderKPIs(tickers) {
   let openCount = 0;
   let itmCount = 0;
   let tickersWithShares = 0;
+  let wheelUnrealized = 0;
+  let wheelCapital = 0;
 
   const range = getPremiumRange();
   for (const tx of filteredTransactions()) {
@@ -1547,16 +1437,14 @@ function renderKPIs(tickers) {
         if (lot.type==='P' && px < lot.strike) itmCount++;
       }
     }
+    // P&L no realizada SOLO de acciones en la rueda (con override manual o historial de opciones)
+    if (isInWheel(t.ticker, t) && t.shares >= 1 && px) {
+      const avgCost = t.costGross / t.shares;
+      const adjCost = (t.costGross - t.premium - t.dividends) / t.shares;
+      wheelUnrealized += (px - (adjCost || avgCost)) * t.shares;
+      wheelCapital += t.costGross;
+    }
   }
-  // P&L Realizada — suma de t.realizedPL calculado en aggregate()
-  // que usa avgCostRaw (costo real de compra, no ajustado por primas)
-  let totalRealized  = 0;
-  let totalDividends = 0;
-  for (const t of arr) {
-    totalRealized  += (t.realizedPL   || 0);
-    totalDividends += (t.dividends    || 0);
-  }
-  const netPnl = totalPremium + totalRealized + totalDividends;
 
   document.getElementById('kpi-premium').textContent = fmtMoney(totalPremium);
   document.getElementById('kpi-premium-month').textContent = fmtMoney(rangePremium);
@@ -1565,6 +1453,14 @@ function renderKPIs(tickers) {
   document.getElementById('kpi-open-options').textContent = openCount;
   document.getElementById('kpi-itm').textContent = itmCount;
   document.getElementById('kpi-tickers').textContent = tickersWithShares;
+
+  // KPI P&L no realizada rueda
+  const unrealEl = document.getElementById('kpi-wheel-unrealized');
+  if (unrealEl) {
+    unrealEl.textContent = fmtMoney(wheelUnrealized);
+    unrealEl.className = 'value ' + (wheelUnrealized >= 0 ? 'pos' : 'neg');
+  }
+
   const rawTime = state.pricesTime;
   let prettyTime = '—';
   if (rawTime) {
@@ -1572,24 +1468,6 @@ function renderKPIs(tickers) {
     prettyTime = isNaN(d) ? rawTime : d.toLocaleString('es-CO', {dateStyle:'short', timeStyle:'short'});
   }
   document.getElementById('kpi-prices-time').textContent = prettyTime;
-
-  // KPIs nuevos — P&L Neto Total y Realizada
-  const netEl    = document.getElementById('kpi-net-pnl');
-  const netStat  = document.getElementById('kpi-net-stat');
-  const netDet   = document.getElementById('kpi-net-detail');
-  const realEl   = document.getElementById('kpi-realized');
-  const realStat = document.getElementById('kpi-realized-stat');
-  if (netEl) {
-    netEl.textContent  = fmtMoney(netPnl);
-    netEl.className    = 'value ' + (netPnl >= 0 ? 'pos' : 'neg');
-  }
-  if (netStat) netStat.style.borderLeftColor = netPnl >= 0 ? 'var(--green)' : 'var(--red)';
-  if (netDet)  netDet.textContent = `Primas ${fmtMoney(totalPremium)} + Acciones ${fmtMoney(totalRealized)} + Div ${fmtMoney(totalDividends)}`;
-  if (realEl) {
-    realEl.textContent = fmtMoney(totalRealized);
-    realEl.className   = 'value ' + (totalRealized >= 0 ? 'pos' : 'neg');
-  }
-  if (realStat) realStat.style.borderLeftColor = totalRealized >= 0 ? 'var(--green)' : 'var(--red)';
 }
 
 function renderOpenOptions(tickers) {
@@ -1674,16 +1552,29 @@ function renderOpenOptions(tickers) {
   });
 }
 
+function isInWheel(ticker, t) {
+  const overrides = getWheelSettings();
+  if (Object.prototype.hasOwnProperty.call(overrides, ticker)) {
+    return overrides[ticker]; // manual override gana siempre
+  }
+  return t.hasOptionHistory || t.openOptions.length > 0; // default automático
+}
+
+function toggleWheelTicker(ticker, checked) {
+  const overrides = getWheelSettings();
+  overrides[ticker] = checked;
+  saveWheelSettings(overrides);
+  recompute();
+}
+
 function renderPositions(tickers) {
   const tbody = document.querySelector('#positions-table tbody');
   tbody.innerHTML = '';
   const showAll = document.getElementById('positions-show-all') && document.getElementById('positions-show-all').checked;
   let arr = Object.values(tickers);
   if (!showAll) {
-    // Default: only tickers that have actually had options activity (opened, closed, expired, assigned)
-    arr = arr.filter(t => t.hasOptionHistory || t.openOptions.length > 0);
+    arr = arr.filter(t => isInWheel(t.ticker, t));
   } else {
-    // Show-all mode: any ticker with shares, realized P&L, premium or dividends
     arr = arr.filter(t => t.shares>0 || t.realizedPL!==0 || t.premium!==0 || t.dividends!==0);
   }
   arr.sort((a,b)=> a.ticker.localeCompare(b.ticker));
@@ -1696,19 +1587,15 @@ function renderPositions(tickers) {
   }
   for (const t of arr) {
     const avgCost = t.shares>0 ? t.costGross/t.shares : 0;
-    const adjustedCost = t.costGross - t.premium - t.dividends;  // net invested after premiums & dividends
+    const adjustedCost = t.costGross - t.premium - t.dividends;
     const adjustedPerShare = t.shares>0 ? adjustedCost/t.shares : null;
     const px = state.prices[t.ticker];
     const unrealized = px && t.shares>0 ? (px - (adjustedPerShare||avgCost))*t.shares : null;
+    const inWheel = isInWheel(t.ticker, t);
     const tr = document.createElement('tr');
-    const isLP = getLPExclusions().has(t.ticker);
-    const lpBadge = `<span class="lp-badge ${isLP?'is-lp':'not-lp'}"
-      onclick="toggleLP('${t.ticker}')" title="Clic para cambiar rol">
-      ${isLP ? '📦 LP' : '🔄 WHEEL'}
-    </span>`;
     tr.innerHTML = `
+      <td style="text-align:center;"><input type="checkbox" class="wheel-toggle" data-ticker="${t.ticker}" ${inWheel?'checked':''} title="Incluir/excluir ${t.ticker} de los cálculos de la rueda"></td>
       <td><strong>${t.ticker}</strong></td>
-      <td>${lpBadge}</td>
       <td>${t.shares.toFixed(0)}</td>
       <td>${fmtMoney(t.costGross)}</td>
       <td>${avgCost ? fmtMoney(avgCost) : '—'}</td>
@@ -1719,12 +1606,12 @@ function renderPositions(tickers) {
       <td>${px ? '$'+px.toFixed(2) : '<span class="muted">—</span>'}</td>
       <td class="${unrealized>=0?'pos':'neg'}">${unrealized!==null ? fmtMoney(unrealized) : '—'}</td>
       <td class="${t.realizedPL>=0?'pos':'neg'}">${fmtMoney(t.realizedPL)}</td>
-      <td class="${(t.premium+t.realizedPL+t.dividends)>=0?'pos':'neg'}" style="font-weight:700;">
-        ${fmtMoney(t.premium + t.realizedPL + t.dividends)}
-      </td>
     `;
     tbody.appendChild(tr);
   }
+  tbody.querySelectorAll('.wheel-toggle').forEach(cb => {
+    cb.addEventListener('change', () => toggleWheelTicker(cb.dataset.ticker, cb.checked));
+  });
 }
 
 function renderHistory() {
@@ -2023,504 +1910,6 @@ function openBulkPriceDialog() {
   alert(`Precios actualizados manualmente: ${updated} tickers.`);
 }
 
-// ════════════════════════════════════════════════════════
-// ROI POR PERÍODO
-// ════════════════════════════════════════════════════════
-
-let _roiPeriod = 7; // días seleccionados actualmente
-
-function getPeriodDates(period) {
-  const today = new Date();
-  today.setHours(23,59,59,999);
-  const todayStr = today.toISOString().slice(0,10);
-
-  let fromDate;
-  if (period === 'all') {
-    fromDate = new Date('2000-01-01');
-  } else if (period === 'ytd') {
-    fromDate = new Date(today.getFullYear(), 0, 1);
-  } else {
-    fromDate = new Date(today);
-    fromDate.setDate(fromDate.getDate() - parseInt(period));
-  }
-  const fromStr = fromDate.toISOString().slice(0,10);
-  const days = period === 'all' ? 365 :
-               period === 'ytd' ? Math.ceil((today - fromDate)/(1000*60*60*24)) :
-               parseInt(period);
-  return { fromStr, todayStr, days };
-}
-
-function calcROI(tickers, period) {
-  /**
-   * Calcula rentabilidad real del capital para el período dado.
-   *
-   * Capital comprometido:
-   *   - Acciones: costo bruto de posiciones en cartera
-   *   - Puts abiertos: (strike × contratos × 100) − prima ya cobrada del contrato
-   *
-   * Retorno del período:
-   *   - Primas netas cobradas/pagadas con fecha dentro del período
-   *   - Dividendos recibidos en el período
-   *   - P&L realizada de ventas en el período
-   *   - P&L no realizada actual (precio actual vs costo bruto)
-   *
-   * ROI = retorno_total / capital_comprometido
-   * ROI Anualizado = ROI × (365 / días_período)
-   */
-  const { fromStr, todayStr, days } = getPeriodDates(period);
-  const txs = filteredTransactions();
-
-  // ── Capital comprometido ACTUAL ──────────────────────────
-  // Solo tickers con historial de opciones (hasOptionHistory)
-  // y NO marcados como LP (Long Position — inversión directa)
-  const lpExclusions = getLPExclusions();
-  let capStocks = 0;
-  let capPuts   = 0;
-
-  for (const t of Object.values(tickers)) {
-    // Excluir: LP explícito, o sin historial de opciones
-    if (lpExclusions.has(t.ticker)) continue;
-    if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
-
-    if (t.shares > 0) capStocks += t.costGross;
-    for (const lot of t.openOptions) {
-      if (lot.type === 'P') {
-        const gross   = lot.strike * lot.contracts * 100;
-        const premium = Math.max(0, parseFloat(lot.premiumNet) || 0);
-        capPuts += Math.max(0, gross - premium);
-      }
-    }
-  }
-  const capTotal = capStocks + capPuts;
-
-  // ── P&L No Realizada — solo tickers Wheel (no LP) ────────
-  // Si hay precios históricos disponibles, usamos la variación del período
-  // para evitar atribuir pérdidas de meses enteros a un período corto.
-  // Si no hay históricos, usamos la variación vs costo (acumulada).
-  const histPrices = state.historicalPrices || {};
-  // Buscar la fecha más cercana disponible (±3 días)
-  // El Apps Script puede ajustar a día hábil, generando diferencia de 1-3 días
-  function findNearestDate(target) {
-    const allDates = Object.keys(histPrices).filter(d => Object.keys(histPrices[d]).length > 0);
-    if (!allDates.length) return null;
-    // Buscar fecha exacta primero
-    if (histPrices[target] && Object.keys(histPrices[target]).length > 0) return target;
-    // Buscar la más cercana dentro de ±4 días
-    let best = null, bestDiff = 5;
-    for (const d of allDates) {
-      const diff = Math.abs(new Date(d) - new Date(target)) / (1000*60*60*24);
-      if (diff < bestDiff) { bestDiff = diff; best = d; }
-    }
-    return best;
-  }
-  const nearestDate = findNearestDate(fromStr);
-  const hasHist     = !!nearestDate;
-  const histDateKey = nearestDate || fromStr;
-
-  // P&L no realizada:
-  // - Con precios históricos: variación real del período (correcto)
-  // - Sin históricos + escenario total: variación vs costo (impreciso pero informativo)
-  // - Sin históricos + escenario operacional: 0 (no distorsiona el ROI)
-  let unrealized = 0;
-  const isOperacional = (_roiScenario !== 'total');
-
-  for (const t of Object.values(tickers)) {
-    if (lpExclusions.has(t.ticker)) continue;
-    if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
-    if (t.shares < 1) continue;
-
-    const pxNow = state.prices[t.ticker] || 0;
-    if (pxNow <= 0) continue;
-
-    if (hasHist) {
-      // Con históricos: variación real del período — aplica en ambos escenarios
-      const pxThen = (histPrices[histDateKey] || {})[t.ticker] || 0;
-      if (pxThen > 0) {
-        unrealized += t.shares * (pxNow - pxThen);
-      } else {
-        // Sin histórico para este ticker específico dentro del período
-        if (!isOperacional) {
-          // En total: usar variación vs costo como aproximación
-          unrealized += t.shares * (pxNow - (t.costGross / t.shares));
-        }
-        // En operacional: omitir
-      }
-    } else {
-      // Sin precios históricos
-      if (isOperacional) {
-        // Operacional: P&L no realizada = 0, no distorsiona el ROI
-        unrealized = 0;
-        break;
-      } else {
-        // Total SIN históricos: no podemos calcular la variación del período
-        // Usar NaN como señal para mostrar advertencia en UI
-        unrealized = NaN;
-        break;
-      }
-    }
-  }
-
-  // ── Retorno del período (solo transacciones en rango) ────
-  let periodPremium   = 0;
-  let periodDividends = 0;
-  let periodRealized  = 0;
-
-  // Para P&L realizada del período necesitamos recalcular
-  // solo las ventas que ocurrieron en el rango
-  const OPTION_RE = /^([A-Z]{1,5})\s+\d{2}\/\d{2}\/\d{4}\s+[\d.]+\s+[CP]$/;
-  const DIVIDEND_ACTIONS = new Set(['cash dividend','qualified dividend','special dividend',
-    'reinvest dividend','non-qualified dividend','prior year cash dividend','qual div reinvest']);
-
-  // Primero reconstruir costo promedio HASTA el inicio del período
-  const costBefore = {}; // ticker → {shares, costGross}
-  for (const tx of txs) {
-    if (tx.date >= fromStr) break; // solo transacciones anteriores al período
-    const sym    = (tx.symbol||'').trim();
-    const action = (tx.action||'').toLowerCase();
-    const amount = tx.amount || 0;
-    const qty    = Math.abs(tx.quantity || 0);
-    if (OPTION_RE.test(sym)) continue;
-    if (!costBefore[sym]) costBefore[sym] = { shares:0, costGross:0 };
-    const cb = costBefore[sym];
-    if (action === 'buy' || action === 'reinvest shares') {
-      cb.shares    += qty;
-      cb.costGross += Math.abs(amount);
-    } else if (action === 'sell') {
-      if (cb.shares > 0) {
-        const avg  = cb.costGross / cb.shares;
-        const sold = Math.min(qty, cb.shares);
-        cb.costGross -= sold * avg;
-        cb.shares    -= sold;
-      }
-    }
-  }
-
-  // Ahora calcular retornos DEL período
-  for (const tx of txs) {
-    if (tx.date < fromStr || tx.date > todayStr) continue;
-    const sym    = (tx.symbol||'').trim();
-    const action = (tx.action||'').toLowerCase();
-    const amount = tx.amount || 0;
-    const qty    = Math.abs(tx.quantity || 0);
-
-    if (OPTION_RE.test(sym)) {
-      if (action === 'sell to open' || action === 'buy to close') {
-        periodPremium += amount;
-      }
-    } else {
-      if (DIVIDEND_ACTIONS.has(action)) {
-        periodDividends += amount;
-      } else if (action === 'sell') {
-        // P&L realizada del período
-        if (!costBefore[sym]) costBefore[sym] = { shares:0, costGross:0 };
-        const cb = costBefore[sym];
-        if (cb.shares > 0) {
-          const avg     = cb.costGross / cb.shares;
-          const sold    = Math.min(qty, cb.shares);
-          const salePx  = Math.abs(amount) / qty;
-          periodRealized += sold * (salePx - avg);
-          const frac     = sold / cb.shares;
-          cb.costGross  -= frac * cb.costGross;
-          cb.shares     -= sold;
-        }
-      } else if (action === 'buy' || action === 'reinvest shares') {
-        if (!costBefore[sym]) costBefore[sym] = { shares:0, costGross:0 };
-        costBefore[sym].shares    += qty;
-        costBefore[sym].costGross += Math.abs(amount);
-      }
-    }
-  }
-
-  // Resultado neto operacional del período (lo que genera The Wheel):
-  //   Primas + Dividendos + P&L Realizada
-  // Estos tres son los ingresos reales del ejercicio — independientes
-  // del precio del mercado en un momento dado
-  const periodNetResult = periodPremium + periodDividends + periodRealized;
-
-  // Retorno total incluye además el movimiento del mercado (no realizado)
-  const periodReturn = periodNetResult + unrealized;
-
-  // ROI operacional — solo ingresos del ejercicio / capital comprometido
-  const roiOps    = capTotal > 0 ? (periodNetResult / capTotal) * 100 : 0;
-  // ROI total — incluyendo movimiento del mercado
-  const roi       = capTotal > 0 ? (periodReturn    / capTotal) * 100 : 0;
-  const roiAnn    = days     > 0 ? roi    * (365 / days) : 0;
-  const roiOpsAnn = days     > 0 ? roiOps * (365 / days) : 0;
-
-  return {
-    capTotal, capStocks, capPuts,
-    unrealized, periodPremium, periodDividends, periodRealized,
-    periodNetResult, periodReturn,
-    roi, roiAnn, roiOps, roiOpsAnn, days,
-  };
-}
-
-let _roiScenario = 'ops'; // 'ops' = operacional, 'total' = con mercado
-
-function renderROI(tickers, period) {
-  const r = calcROI(tickers, period);
-
-  // Seleccionar valores según escenario activo
-  const isTotal  = _roiScenario === 'total';
-  const roiVal   = isTotal ? r.roi    : r.roiOps;
-  const roiAnnV  = isTotal ? r.roiAnn : r.roiOpsAnn;
-  const retorno  = isTotal ? r.periodReturn : r.periodNetResult;
-
-  // Descripción del escenario
-  const descEl = document.getElementById('scenario-desc');
-  if (descEl) descEl.textContent = isTotal
-    ? 'Primas + Dividendos + P&L Realizada + P&L No Realizada (movimiento del mercado incluido)'
-    : 'Primas + Dividendos + P&L Realizada (sin movimiento del mercado)';
-
-  const annSubEl = document.getElementById('roi-ann-sub');
-  if (annSubEl) annSubEl.textContent = isTotal
-    ? 'total × 365/días'
-    : 'operacional × 365/días';
-
-  // Capital comprometido
-  const capEl = document.getElementById('roi-capital');
-  const capDet = document.getElementById('roi-capital-detail');
-  if (capEl) capEl.textContent = fmtMoney(r.capTotal);
-  if (capDet) capDet.textContent =
-    `Acciones ${fmtMoney(r.capStocks)} + Puts ${fmtMoney(r.capPuts)}`;
-
-  // ROI del período
-  const roiEl  = document.getElementById('roi-pct');
-  const roiAnn = document.getElementById('roi-ann');
-  const roiLbl = document.getElementById('roi-period-label');
-  const roiM   = document.getElementById('roi-metric-pct');
-  const roiMA  = document.getElementById('roi-metric-ann');
-  if (roiEl) {
-    roiEl.textContent = roiVal.toFixed(2) + '%';
-    roiEl.className   = 'roi-metric-value ' + (roiVal >= 0 ? 'pos' : 'neg');
-  }
-  if (roiAnn) {
-    roiAnn.textContent = roiAnnV.toFixed(2) + '%';
-    roiAnn.className   = 'roi-metric-value ' + (roiAnnV >= 0 ? 'pos' : 'neg');
-  }
-  if (roiM)  roiM.className  = 'roi-metric ' + (roiVal  >= 0 ? 'green' : 'red');
-  if (roiMA) roiMA.className = 'roi-metric ' + (roiAnnV >= 0 ? 'green' : 'red');
-
-  const periodLabels = { '7':'últimos 7 días', '30':'últimos 30 días',
-    '90':'últimos 90 días', '180':'últimos 180 días', 'ytd':'año en curso', 'all':'todo el período' };
-  const hasHistData = state.historicalPrices && Object.keys(state.historicalPrices).length > 0;
-  const histNote = hasHistData ? '' : ' (sin precios históricos — usando variación vs costo)';
-  if (roiLbl) roiLbl.textContent = (periodLabels[String(period)] || '') + histNote;
-
-  // P&L no realizada — siempre visible como información
-  const unrEl  = document.getElementById('roi-unrealized');
-  const unrDet = document.getElementById('roi-unrealized-detail');
-  if (unrEl) {
-    unrEl.textContent = fmtMoney(r.unrealized);
-    unrEl.className   = 'roi-metric-value ' + (r.unrealized >= 0 ? 'pos' : 'neg');
-    const parent = unrEl.closest('.roi-metric');
-    // En escenario operacional se muestra atenuado — es info, no parte del ROI
-    if (parent) {
-      parent.className = 'roi-metric ' + (r.unrealized >= 0 ? 'green' : 'red');
-      parent.style.opacity = isTotal ? '1' : '0.6';
-      parent.title = isTotal
-        ? 'Incluida en el ROI Total'
-        : 'Informativo — no incluida en el ROI Operacional';
-    }
-  }
-  if (unrDet) unrDet.textContent = (r.unrealized >= 0
-    ? `+${fmtMoney(r.unrealized)} ganancia latente`
-    : `${fmtMoney(r.unrealized)} pérdida latente`)
-    + (isTotal ? ' (incluida en ROI)' : ' (no incluida en ROI)');
-
-  // Breakdown
-  const fmt = (v) => {
-    const el = document.createElement('span');
-    el.textContent = fmtMoney(v);
-    el.className = v >= 0 ? 'pos' : 'neg';
-    return el.outerHTML;
-  };
-  const setBreakdown = (id, v) => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = fmt(v);
-  };
-  setBreakdown('rb-premium',    r.periodPremium);
-  setBreakdown('rb-dividends',  r.periodDividends);
-  setBreakdown('rb-realized',   r.periodRealized);
-  setBreakdown('rb-unrealized', r.unrealized);
-  setBreakdown('rb-cap-stocks', r.capStocks);
-  setBreakdown('rb-cap-puts',   r.capPuts);
-  // Resultado neto operacional
-  const netEl = document.getElementById('rb-net-result');
-  if (netEl) {
-    netEl.innerHTML = `<span class="${r.periodNetResult>=0?'pos':'neg'}" style="font-weight:700">${fmtMoney(r.periodNetResult)}</span>`;
-  }
-}
-
-// ── Cache de precios históricos ──────────────────────────────
-// { "2026-05-17": { "BAC": 54.20, "ORCL": 195.30 } }
-const _histPricesCache = {};
-let   _histPricesFetching = false;
-
-async function fetchHistoricalPrices(sheetsUrl, profile, tickers, periods) {
-  /**
-   * Consulta el Apps Script para obtener precios históricos.
-   * Guarda en cache para no repetir la llamada en el mismo período.
-   * Si no hay sheetsUrl configurada, devuelve vacío silenciosamente.
-   */
-  if (!sheetsUrl || !tickers.length) return {};
-
-  const cacheKey = periods.join(',') + '|' + tickers.sort().join(',');
-  if (_histPricesCache[cacheKey]) return _histPricesCache[cacheKey];
-  if (_histPricesFetching) return {};
-
-  try {
-    _histPricesFetching = true;
-    const sep = sheetsUrl.includes('?') ? '&' : '?';
-    const url = `${sheetsUrl}${sep}action=historicalPrices&profile=${profile}&tickers=${tickers.join(',')}&periods=${periods.join(',')}`;
-    const resp = await fetch(url, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    });
-    const data = await resp.json();
-    if (data.ok && data.prices) {
-      _histPricesCache[cacheKey] = data.prices;
-      return data.prices;
-    }
-  } catch(e) {
-    console.warn('Historical prices fetch failed:', e.message);
-  } finally {
-    _histPricesFetching = false;
-  }
-  return {};
-}
-
-function calcUnrealizedForPeriod(tickers, historicalPrices, fromDateStr) {
-  /**
-   * Calcula P&L no realizada DEL PERÍODO usando precios históricos.
-   * P&L período = (precio HOY - precio al inicio del período) × acciones
-   *
-   * Esto evita la distorsión de usar la P&L total acumulada
-   * (que puede ser de meses) como si fuera del período seleccionado.
-   */
-  const lpExclusions = getLPExclusions();
-  let unrealizedPeriod = 0;
-
-  for (const t of Object.values(tickers)) {
-    if (lpExclusions.has(t.ticker)) continue;
-    if (!t.hasOptionHistory && t.openOptions.length === 0) continue;
-    if (t.shares < 1) continue;
-
-    const pxNow  = state.prices[t.ticker] || 0;
-    const pxThen = (historicalPrices[fromDateStr] || {})[t.ticker] || 0;
-
-    if (pxNow > 0 && pxThen > 0) {
-      // Variación real del período
-      unrealizedPeriod += t.shares * (pxNow - pxThen);
-    } else if (pxNow > 0) {
-      // Sin precio histórico → usar variación vs costo (fallback)
-      unrealizedPeriod += t.shares * (pxNow - (t.costGross / t.shares));
-    }
-  }
-  return unrealizedPeriod;
-}
-
-// ── LP State (persiste en localStorage) ──────────────────────
-const LP_KEY = 'cc-lp-exclusions';
-function getLPExclusions() {
-  try { return new Set(JSON.parse(localStorage.getItem(LP_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-function toggleLP(ticker) {
-  const lps = getLPExclusions();
-  if (lps.has(ticker)) lps.delete(ticker);
-  else lps.add(ticker);
-  localStorage.setItem(LP_KEY, JSON.stringify([...lps]));
-  const tickers = aggregate();
-  renderPositions(tickers);
-  renderROI(tickers, _roiPeriod);
-  updateLPBar();
-}
-function updateLPBar() {
-  const lps = getLPExclusions();
-  const bar  = document.getElementById('lp-excluded-bar');
-  const list = document.getElementById('lp-excluded-list');
-  if (!bar || !list) return;
-  if (lps.size === 0) {
-    bar.style.display = 'none';
-  } else {
-    bar.style.display = 'flex';
-    list.textContent = [...lps].sort().join(', ');
-  }
-}
-
-function setupROITabs() {
-  document.querySelectorAll('.roi-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.roi-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      _roiPeriod = btn.dataset.period;
-      const tickers = aggregate();
-      renderROI(tickers, _roiPeriod);
-    });
-  });
-  document.querySelectorAll('.scenario-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      _roiScenario = btn.dataset.scenario;
-      const tickers = aggregate();
-      renderROI(tickers, _roiPeriod);
-    });
-  });
-
-  // Botón de precios históricos
-  const btnHist = document.getElementById('btn-load-hist');
-  if (btnHist) {
-    btnHist.addEventListener('click', async () => {
-      const sheetsUrl = getSheetsUrl();
-      const profile   = getProfile() || 'DISA';
-      if (!sheetsUrl) {
-        alert('Configura la URL de Google Sheets en el panel de Ajustes del dashboard.');
-        return;
-      }
-
-      const histStatus = document.getElementById('hist-status');
-      if (histStatus) histStatus.textContent = '⏳ Cargando...';
-      btnHist.disabled = true;
-
-      // Obtener tickers Wheel activos
-      const tickers  = aggregate();
-      const lpExcl   = getLPExclusions();
-      const wheelTks = Object.values(tickers)
-        .filter(t => t.shares >= 1 && t.hasOptionHistory && !lpExcl.has(t.ticker))
-        .map(t => t.ticker);
-
-      if (!wheelTks.length) {
-        if (histStatus) histStatus.textContent = '⚠ Sin tickers Wheel activos';
-        btnHist.disabled = false;
-        return;
-      }
-
-      try {
-        const histData = await fetchHistoricalPrices(
-          sheetsUrl, profile, wheelTks, ['7','30','90','180','ytd']
-        );
-
-        if (Object.keys(histData).length > 0) {
-          state.historicalPrices = histData;
-          const dates = Object.keys(histData).length;
-          if (histStatus) histStatus.textContent = `✓ ${dates} fechas cargadas`;
-          // Recalcular ROI con los nuevos precios
-          renderROI(tickers, _roiPeriod);
-        } else {
-          if (histStatus) histStatus.textContent = '⚠ Sin datos — verifica la URL de Sheets';
-        }
-      } catch(e) {
-        if (histStatus) histStatus.textContent = `✗ Error: ${e.message}`;
-      } finally {
-        btnHist.disabled = false;
-      }
-    });
-  }
-}
-
-
 // ----- Wiring -----
 document.getElementById('csv-input').addEventListener('change', e => {
   if (e.target.files.length) handleFiles(e.target.files);
@@ -2560,7 +1949,7 @@ document.getElementById('bulk-prices-btn').addEventListener('click', openBulkPri
 document.getElementById('api-key-btn').addEventListener('click', openApiKeyDialog);
 document.getElementById('clear-data').addEventListener('click', ()=>{
   if (confirm('¿Borrar todos los datos almacenados? Considera exportar el JSON antes.')) {
-    state = { transactions:[], prices:{}, pricesTime:null, historicalPrices:{} };
+    state = { transactions:[], prices:{}, pricesTime:null };
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(PRICES_KEY);
     localStorage.removeItem(PRICES_TIME_KEY);
@@ -2705,7 +2094,111 @@ function setupManualForm() {
   });
 }
 
-// ----- Google Sheets Sync + Perfiles -----
+// ----- KPI Info Modal -----
+const KPI_INFO = {
+  'premium-total': {
+    title: 'Primas netas cobradas (total)',
+    desc: 'Suma de todas las primas cobradas al vender opciones (Sell to Open), menos lo pagado al cerrar anticipadamente (Buy to Close). Representa el ingreso total generado por la estrategia de la rueda desde el inicio.',
+    formula: 'Σ(Sell to Open) − Σ(Buy to Close)'
+  },
+  'premium-range': {
+    title: 'Primas en rango seleccionado',
+    desc: 'Mismo cálculo que las primas totales pero filtrado al período seleccionado (mes actual, últimos 30 días, etc.). Útil para medir la generación de ingresos en un período específico.',
+    formula: 'Σ(Sell to Open en rango) − Σ(Buy to Close en rango)'
+  },
+  'open-options': {
+    title: 'Posiciones de opción abiertas',
+    desc: 'Número de contratos de opciones actualmente abiertos (vendidos y no cerrados ni expirados). Cada contrato representa 100 acciones subyacentes.',
+    formula: 'Contratos con Sell to Open sin Buy to Close ni expiración'
+  },
+  'itm': {
+    title: 'En riesgo de asignación (ITM)',
+    desc: 'Opciones que están In-The-Money: calls donde el precio actual supera el strike, o puts donde el precio actual está por debajo del strike. Estas posiciones tienen mayor probabilidad de ser ejercidas al vencimiento.',
+    formula: 'CALL ITM: precio actual > strike\nPUT ITM: precio actual < strike'
+  },
+  'tickers': {
+    title: 'Tickers con acciones',
+    desc: 'Número de activos diferentes en los que actualmente tienes acciones en cartera (independientemente de si tienen opciones abiertas o no).',
+    formula: 'COUNT(tickers donde shares ≥ 1)'
+  },
+  'prices-time': {
+    title: 'Última actualización de precios',
+    desc: 'Fecha y hora en que se actualizaron los precios por última vez. Los precios se obtienen via Google Finance a través del Apps Script de Google Sheets cada vez que abres el dashboard o presionas "Actualizar precios".',
+    formula: 'Timestamp de la última llamada exitosa a updatePrices()'
+  },
+  'wheel-unrealized': {
+    title: 'P&L no realizada (solo la rueda)',
+    desc: 'Ganancia o pérdida no realizada calculada únicamente sobre las acciones que han participado en la estrategia de la rueda (aquellas sobre las que se ha vendido alguna opción). Excluye acciones de inversión pura como BRKB, LULU, VGT, etc.',
+    formula: 'Σ[(precio actual − costo real ajustado) × acciones]\nDonde costo real = (costo bruto − primas − dividendos) / acciones\nSolo tickers con hasOptionHistory = true'
+  }
+};
+
+function showKpiInfo(key) {
+  const info = KPI_INFO[key];
+  if (!info) return;
+  let modal = document.getElementById('kpi-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kpi-modal';
+    modal.className = 'kpi-modal';
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="kpi-modal-box">
+      <button class="kpi-modal-close" onclick="document.getElementById('kpi-modal').style.display='none'">✕</button>
+      <h3>ℹ️ ${info.title}</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin:0 0 0.5rem;">${info.desc}</p>
+      <div class="formula">${info.formula.replace(/\n/g,'<br>')}</div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+// ----- Wheel Settings Sync (sincroniza selecciones a Sheets) -----
+// El dashboard usa hasOptionHistory automáticamente para la rueda.
+// Para tickers adicionales marcados manualmente, los guardamos en Sheets.
+const WHEEL_SETTINGS_KEY = 'cc_wheel_settings_v1';
+
+function getWheelSettings() {
+  try { return JSON.parse(localStorage.getItem(WHEEL_SETTINGS_KEY) || '{}'); } catch(e) { return {}; }
+}
+
+function saveWheelSettings(settings) {
+  localStorage.setItem(WHEEL_SETTINGS_KEY, JSON.stringify(settings));
+  // Sync to Sheets
+  syncWheelSettingsToSheets(settings);
+}
+
+async function syncWheelSettingsToSheets(settings) {
+  const url = getSheetsUrl();
+  const profile = getProfile();
+  if (!url || !profile) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveSettings',
+        profile,
+        settings
+      })
+    });
+  } catch(e) { console.warn('Settings sync failed:', e.message); }
+}
+
+async function loadWheelSettingsFromSheets() {
+  const url = getSheetsUrl();
+  const profile = getProfile();
+  if (!url || !profile) return;
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const resp = await fetch(`${url}${sep}action=getSettings&profile=${encodeURIComponent(profile)}`);
+    const data = await resp.json();
+    if (data.settings) {
+      localStorage.setItem(WHEEL_SETTINGS_KEY, JSON.stringify(data.settings));
+    }
+  } catch(e) { console.warn('Settings load failed:', e.message); }
+}
+
 const SHEETS_URL_KEY  = 'cc_sheets_url_v1';
 const SHEETS_PROFILE_KEY = 'cc_sheets_profile_v1';
 const PROFILES = {
@@ -2773,6 +2266,9 @@ async function sheetsLoad() {
     saveState(false);
     recompute();
     updateSheetsStatus('syncing', `✅ ${state.transactions.length} txs · Actualizando precios via Google Finance…`);
+
+    // Cargar settings sincronizados
+    await loadWheelSettingsFromSheets();
 
     // Auto-actualizar precios via GOOGLEFINANCE al cargar
     try {
@@ -2936,8 +2432,6 @@ if (getSheetsUrl() && getProfile()) {
 
 setupManualForm();
 setupSimulator();
-setupROITabs();
-updateLPBar();
 
 // Wire chart controls
 ['chart-group','chart-periods'].forEach(id => {
