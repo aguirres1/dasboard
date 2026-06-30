@@ -1483,7 +1483,26 @@ function getRoiRange() {
   return { from: ymd(from), to: ymd(to), label, days };
 }
 
-function renderRoi(tickers) {
+let __roiHistPricesCache = {}; // { 'YYYY-MM-DD': { TICKER: price } }
+
+async function fetchHistoricalPrices(dateStr) {
+  if (__roiHistPricesCache[dateStr]) return __roiHistPricesCache[dateStr];
+  const url = getSheetsUrl();
+  const profile = getProfile();
+  if (!url || !profile) return {};
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const resp = await fetch(`${url}${sep}action=getHistoricalPrices&profile=${encodeURIComponent(profile)}&date=${dateStr}`);
+    const data = await resp.json();
+    if (data.ok && data.prices) {
+      __roiHistPricesCache[dateStr] = data.prices;
+      return data.prices;
+    }
+  } catch(e) { console.warn('Historical prices fetch failed:', e.message); }
+  return {};
+}
+
+async function renderRoi(tickers) {
   const grid = document.getElementById('roi-grid');
   if (!grid) return;
   const range = getRoiRange();
@@ -1491,35 +1510,93 @@ function renderRoi(tickers) {
     ? document.getElementById('roi-include-unrealized').checked
     : true;
 
-  // 1) Primas + dividendos del período, SOLO sobre tickers en la rueda
+  if (range.days !== null && includeUnrealized) {
+    const note = document.querySelector('#roi-unrealized-card .muted');
+    if (note) note.textContent = 'Cargando precio histórico…';
+  }
+
+  // 1) Primas + dividendos del período, SOLO sobre tickers en la rueda.
+  //    Las primas se PRORRATEAN según cuántos días de la vida del contrato
+  //    caen dentro de la ventana del período evaluado. Ej: un put a 12 meses
+  //    evaluado en una ventana de 30 días solo aporta 30/365 de su prima total
+  //    (y solo si esos 30 días están dentro de la vida del contrato).
   let periodPremium = 0;
   let periodDividends = 0;
   let periodRealized = 0;
 
-  const premiumTxs = [];
+  const premiumTxs = [];       // transacciones reales (para el detalle transaccional)
   const dividendTxs = [];
+  const proratedPremiumDetail = []; // detalle del prorrateo por contrato
 
+  // Agrupamos sell-to-open / buy-to-close por contrato para conocer su vida completa
+  const contractLife = {}; // key -> { ticker, openDate, closeDate, totalPremium, totalDays }
+  for (const tx of filteredTransactions()) {
+    const opt = classifyOption(tx.symbol);
+    if (!opt) continue;
+    const t = tickers[opt.underlying];
+    if (!t || !isInWheel(opt.underlying, t)) continue;
+    const a = tx.action.toLowerCase();
+    if (a !== 'sell to open' && a !== 'buy to close') continue;
+
+    const key = `${opt.underlying}|${opt.type}|${opt.strike}|${opt.expiration}`;
+    if (!contractLife[key]) {
+      contractLife[key] = {
+        ticker: opt.underlying, type: opt.type, strike: opt.strike, expiration: opt.expiration,
+        openDate: null, closeDate: null, totalPremium: 0, txs: []
+      };
+    }
+    const c = contractLife[key];
+    c.totalPremium += tx.amount;
+    c.txs.push(tx);
+    if (a === 'sell to open') {
+      if (!c.openDate || tx.date < c.openDate) c.openDate = tx.date;
+    } else {
+      if (!c.closeDate || tx.date > c.closeDate) c.closeDate = tx.date;
+    }
+  }
+
+  const dayMs = 86400000;
+  const dateNum = (s) => new Date(s + 'T00:00:00').getTime();
+
+  for (const key of Object.keys(contractLife)) {
+    const c = contractLife[key];
+    if (!c.openDate) continue; // no debería pasar, pero por seguridad
+    const lifeEnd = c.closeDate || c.expiration; // si sigue abierto, su vida llega hasta el vencimiento
+    const totalDays = Math.max(1, Math.round((dateNum(lifeEnd) - dateNum(c.openDate)) / dayMs) + 1);
+
+    // Intersección entre [openDate, lifeEnd] y [range.from, range.to]
+    const overlapStart = Math.max(dateNum(c.openDate), dateNum(range.from));
+    const overlapEnd   = Math.min(dateNum(lifeEnd), dateNum(range.to));
+    const overlapDays  = Math.max(0, Math.round((overlapEnd - overlapStart) / dayMs) + 1);
+
+    if (overlapDays <= 0) continue; // el contrato no existió durante este período
+
+    const prorated = c.totalPremium * (overlapDays / totalDays);
+    periodPremium += prorated;
+    premiumTxs.push(...c.txs); // transacciones reales para el detalle (no prorrateadas individualmente)
+    proratedPremiumDetail.push({
+      ticker: c.ticker, type: c.type, strike: c.strike, expiration: c.expiration,
+      openDate: c.openDate, lifeEnd, totalDays, overlapDays,
+      totalPremium: c.totalPremium, prorated
+    });
+  }
+
+  // Dividendos sí son puntuales (se cobran en una fecha exacta), no se prorratean
   for (const tx of filteredTransactions()) {
     if (tx.date < range.from || tx.date > range.to) continue;
-    const opt = classifyOption(tx.symbol);
-    const underlying = opt ? opt.underlying : (tx.symbol || '').trim();
+    const sym = (tx.symbol || '').trim();
+    const opt = classifyOption(sym);
+    const underlying = opt ? opt.underlying : sym;
     const t = tickers[underlying];
     if (!t || !isInWheel(underlying, t)) continue;
-
-    const a = tx.action.toLowerCase();
-    if (a === 'sell to open' || a === 'buy to close') {
-      periodPremium += tx.amount;
-      premiumTxs.push(tx);
-    } else if (/dividend/i.test(a)) {
+    if (/dividend/i.test(tx.action.toLowerCase())) {
       periodDividends += tx.amount;
       dividendTxs.push(tx);
     }
   }
 
-  // 2) P&L realizada del período: aproximamos sumando realizedPL completo de tickers
-  //    con actividad de cierre/asignación dentro del rango (heurística: si tuvo
-  //    transacciones de Sell o Assigned-Call en el rango, atribuimos su realizedPL total)
-  const realizedTxs = [];
+  // 2) P&L realizada del período: sumamos realizedPL completo de tickers
+  //    con actividad de cierre/asignación dentro del rango
   const realizedByTicker = [];
   for (const t of Object.values(tickers)) {
     if (!isInWheel(t.ticker, t)) continue;
@@ -1534,18 +1611,23 @@ function renderRoi(tickers) {
     });
     if (closesInRange.length > 0) {
       periodRealized += t.realizedPL;
-      realizedTxs.push(...closesInRange);
       realizedByTicker.push({ ticker: t.ticker, realizedPL: t.realizedPL, txs: closesInRange });
     }
   }
 
   // 3) Capital operacional base:
   //    a) Costo bruto de acciones HOY en tickers de la rueda
-  //    b) + Capital bloqueado en TODOS los puts vendidos abiertos (cash-secured puts),
-  //       sin importar si ese mismo ticker también tiene acciones — son capitales distintos.
+  //    b) + Capital bloqueado en TODOS los puts vendidos abiertos (cash-secured puts)
   let capitalBase = 0;
-  let unrealizedToday = 0;
-  const roiBreakdown = { shares: [], puts: [] }; // para el detalle al hacer clic
+  let unrealizedToday = 0;       // P&L no realizada total (foto de hoy, todo el histórico de la posición)
+  let unrealizedPeriod = 0;      // SOLO el cambio de precio dentro de la ventana del período
+  const roiBreakdown = { shares: [], puts: [] };
+
+  // Fetch precios históricos al inicio del período, solo si vamos a necesitarlos
+  let histPrices = {};
+  if (range.days) { // "Todo el histórico" (days=null) no necesita esto — ahí sí aplica el acumulado completo
+    histPrices = await fetchHistoricalPrices(range.from);
+  }
 
   for (const t of Object.values(tickers)) {
     if (!isInWheel(t.ticker, t)) continue;
@@ -1553,14 +1635,32 @@ function renderRoi(tickers) {
     if (t.shares >= 1) {
       capitalBase += t.costGross;
       const px = state.prices[t.ticker];
-      let u = null;
+      const shares = Math.round(t.shares);
+      let uToday = null, uPeriod = null;
+
       if (px) {
         const avgCost = t.costGross / t.shares;
         const adjCost = (t.costGross - t.premium - t.dividends) / t.shares;
-        u = (px - (adjCost || avgCost)) * Math.round(t.shares);
-        unrealizedToday += u;
+        uToday = (px - (adjCost || avgCost)) * shares;
+        unrealizedToday += uToday;
+
+        if (range.days === null) {
+          // Todo el histórico: el cambio "del período" ES el acumulado completo
+          uPeriod = uToday;
+        } else {
+          // Período acotado: solo contamos el movimiento de precio DENTRO de la ventana,
+          // usando el precio histórico al inicio del rango como referencia (no el costo de compra).
+          const pxStart = histPrices[t.ticker];
+          if (pxStart) {
+            uPeriod = (px - pxStart) * shares;
+          } else {
+            // Sin dato histórico disponible: no inventamos un número, dejamos 0 para este ticker
+            uPeriod = 0;
+          }
+        }
+        unrealizedPeriod += uPeriod;
       }
-      roiBreakdown.shares.push({ ticker: t.ticker, shares: Math.round(t.shares), costGross: t.costGross, unrealized: u });
+      roiBreakdown.shares.push({ ticker: t.ticker, shares, costGross: t.costGross, unrealized: uToday, unrealizedPeriod: uPeriod, pxStart: histPrices[t.ticker] || null });
     }
 
     for (const lot of t.openOptions) {
@@ -1571,13 +1671,15 @@ function renderRoi(tickers) {
       }
     }
   }
-  const periodTotal = periodPremium + periodDividends + periodRealized + (includeUnrealized ? unrealizedToday : 0);
+
+  const unrealizedUsed = includeUnrealized ? unrealizedPeriod : 0;
+  const periodTotal = periodPremium + periodDividends + periodRealized + unrealizedUsed;
 
   window.__roiBreakdown = {
     ...roiBreakdown,
     range,
-    capitalBase, unrealizedToday, periodPremium, periodDividends, periodRealized, periodTotal,
-    premiumTxs, dividendTxs, realizedByTicker
+    capitalBase, unrealizedToday, unrealizedPeriod, periodPremium, periodDividends, periodRealized, periodTotal,
+    premiumTxs, dividendTxs, realizedByTicker, proratedPremiumDetail
   };
 
   const roiPct = capitalBase > 0 ? (periodTotal / capitalBase * 100) : 0;
@@ -1594,10 +1696,23 @@ function renderRoi(tickers) {
   setVal('roi-capital', fmtMoney(capitalBase));
   setVal('roi-premium', fmtMoney(periodPremium + periodDividends), (periodPremium+periodDividends)>=0?'pos':'neg');
   setVal('roi-realized', fmtMoney(periodRealized), periodRealized>=0?'pos':'neg');
-  setVal('roi-unrealized', fmtMoney(unrealizedToday), unrealizedToday>=0?'pos':'neg');
+  setVal('roi-unrealized', fmtMoney(unrealizedPeriod), unrealizedPeriod>=0?'pos':'neg');
   setVal('roi-total', fmtMoney(periodTotal), periodTotal>=0?'pos':'neg');
   setVal('roi-pct', roiPct.toFixed(2)+'%', roiPct>=0?'pos':'neg');
   setVal('roi-annual', roiAnnual!==null ? roiAnnual.toFixed(2)+'%' : '—', (roiAnnual??0)>=0?'pos':'neg');
+
+  const unrealLabel = document.querySelector('#roi-unrealized-card .label');
+  if (unrealLabel) {
+    unrealLabel.innerHTML = range.days === null
+      ? 'P&L No Realizada (todo el histórico) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo(\'roi-unrealized\')">?</span>'
+      : `P&L No Realizada (solo este período) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('roi-unrealized')">?</span>`;
+  }
+  const unrealNote = document.querySelector('#roi-unrealized-card .muted');
+  if (unrealNote) {
+    unrealNote.textContent = range.days === null
+      ? 'Acumulado completo desde la compra · Clic para detalle'
+      : `Solo el cambio de precio en ${range.label.toLowerCase()} · Clic para detalle`;
+  }
 
   const unrealCard = document.getElementById('roi-unrealized-card');
   if (unrealCard) unrealCard.style.opacity = includeUnrealized ? '1' : '0.4';
@@ -2367,8 +2482,8 @@ const KPI_INFO = {
   },
   'roi-premium': {
     title: 'Primas + Dividendos (período)',
-    desc: 'Suma de las primas netas (Sell to Open menos Buy to Close) y los dividendos cobrados, solo de transacciones dentro del período seleccionado y solo de tickers marcados como parte de la rueda.',
-    formula: 'Σ(Sell to Open − Buy to Close) + Σ(Dividendos) en el rango de fechas'
+    desc: 'Cada contrato de opción se PRORRATEA: aporta solo la fracción de su prima total proporcional a los días de su vida (desde apertura hasta cierre o vencimiento) que caen dentro del período evaluado. Así, un put a 12 meses evaluado en una ventana de 30 días solo aporta ~30/365 de su prima — no la prima completa. Los dividendos no se prorratean, se cuentan en su fecha exacta de pago.',
+    formula: 'Por contrato: Prima total × (días del contrato dentro del período ÷ días totales de vida del contrato)\n+ Σ(Dividendos) en la fecha exacta dentro del rango'
   },
   'roi-realized': {
     title: 'P&L Realizada (período)',
@@ -2376,9 +2491,9 @@ const KPI_INFO = {
     formula: 'Σ(realizedPL del ticker) si tuvo un cierre dentro del rango de fechas'
   },
   'roi-unrealized': {
-    title: 'P&L No Realizada (hoy)',
-    desc: 'Es la fotografía de HOY, no tiene "período" — muestra cuánto ganarías o perderías si vendieras ahora mismo las acciones que tienes en la rueda, al precio actual, comparado contra tu costo real ajustado (ya descontando primas y dividendos cobrados sobre esa posición).',
-    formula: 'Σ[(precio actual − costo real ajustado) × acciones] de tickers en la rueda'
+    title: 'P&L No Realizada (del período)',
+    desc: 'Mide SOLO el cambio de precio de las acciones que tienes en la rueda DENTRO del período seleccionado — no la ganancia/pérdida acumulada desde que compraste. Por ejemplo, si elegiste "Semanal (7 días)", aquí ves cuánto subió o bajó el valor de tus acciones en esos 7 días, no en toda la vida de la posición. Cuando el período es "Todo el histórico", sí coincide con el acumulado completo desde la compra.',
+    formula: 'Si período acotado: Σ[(precio hoy − precio al inicio del período) × acciones]\nSi "Todo el histórico": Σ[(precio hoy − costo real ajustado) × acciones]\nEl precio histórico se obtiene de Google Finance via el Apps Script'
   },
   'roi-total': {
     title: 'Ganancia/Pérdida Total (período)',
@@ -2637,13 +2752,18 @@ function showRoiDetail(field) {
   if (!d) return;
 
   if (field === 'capital') {
-    const sharesRows = d.shares.map(s => `
+    const sharesRows = d.shares.map(s => {
+      const pxLabel = s.pxStart
+        ? `Precio inicio período: $${s.pxStart.toFixed(2)} → hoy: $${(state.prices[s.ticker]||0).toFixed(2)}`
+        : (d.range.days===null ? 'Costo de compra usado como base' : 'Sin precio histórico disponible para este período');
+      return `
       <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
-        <td style="padding:5px 8px;font-weight:600;">${s.ticker}</td>
-        <td style="padding:5px 8px;">Acciones en cartera</td>
-        <td style="padding:5px 8px;text-align:right;">${s.shares}</td>
-        <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmtMoney(s.costGross)}</td>
-      </tr>`).join('');
+        <td style="padding:5px 8px;font-weight:600;vertical-align:top;">${s.ticker}</td>
+        <td style="padding:5px 8px;vertical-align:top;">Acciones en cartera<br><span style="font-size:0.7rem;color:var(--muted);">${pxLabel}</span></td>
+        <td style="padding:5px 8px;text-align:right;vertical-align:top;">${s.shares}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:600;vertical-align:top;">${fmtMoney(s.costGross)}</td>
+      </tr>`;
+    }).join('');
     const putRows = d.puts.map(p => `
       <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
         <td style="padding:5px 8px;font-weight:600;">${p.ticker}</td>
@@ -2668,18 +2788,41 @@ function showRoiDetail(field) {
         <span style="font-weight:700;font-size:1.05rem;">${fmtMoney(d.capitalBase)}</span>
       </div>`;
     openDetailModal('💰 Composición del Capital Operacional',
-      'Acciones que ya tienes en la rueda + capital bloqueado en cada PUT vendido y aún abierto (incluye vencimientos de largo plazo).',
+      'Acciones que ya tienes en la rueda + capital bloqueado en cada PUT vendido y aún abierto (incluye vencimientos de largo plazo, como TSLA o NVDA a 2 años — el capital se incluye completo, pero su prima ya se cobró en el momento de venderlo, no en este período).',
       body);
 
   } else if (field === 'premium') {
+    const proratedRows = (d.proratedPremiumDetail || []).map(p => `
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+        <td style="padding:5px 8px;font-weight:600;vertical-align:top;">${p.ticker}</td>
+        <td style="padding:5px 8px;vertical-align:top;">${p.type==='C'?'CALL':'PUT'} $${p.strike}<br><span style="font-size:0.7rem;color:var(--muted);">${p.openDate} → ${p.lifeEnd}</span></td>
+        <td style="padding:5px 8px;text-align:right;vertical-align:top;">${fmtMoney(p.totalPremium)}</td>
+        <td style="padding:5px 8px;text-align:right;vertical-align:top;">${p.overlapDays}/${p.totalDays}d</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:600;vertical-align:top;color:${p.prorated>=0?'var(--green)':'var(--red)'};">${fmtMoney(p.prorated)}</td>
+      </tr>`).join('');
+    const proratedTable = (d.proratedPremiumDetail || []).length ? `
+      <div style="max-height:280px;overflow-y:auto;margin-bottom:1rem;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+          <thead><tr style="color:var(--muted);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Ticker</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Contrato</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Prima total</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Días en período</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Prorrateado</th>
+          </tr></thead>
+          <tbody>${proratedRows}</tbody>
+        </table>
+      </div>` : '';
     const allTxs = [...d.premiumTxs, ...d.dividendTxs];
-    const body = txTableHtml(allTxs) + `
+    const body = proratedTable +
+      `<div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.4rem;">Transacciones reales que componen estos contratos</div>` +
+      txTableHtml(allTxs) + `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
-        <span style="font-weight:600;">Total primas + dividendos (${d.range.label})</span>
+        <span style="font-weight:600;">Total primas (prorrateadas) + dividendos (${d.range.label})</span>
         <span style="font-weight:700;font-size:1.05rem;color:${(d.periodPremium+d.periodDividends)>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.periodPremium+d.periodDividends)}</span>
       </div>`;
     openDetailModal('💵 Primas y Dividendos del Período',
-      `Transacciones de Sell to Open, Buy to Close y dividendos entre ${d.range.from} y ${d.range.to}, solo tickers en la rueda.`,
+      `Cada contrato aporta solo la fracción de su prima proporcional a los días de su vida que caen dentro de ${d.range.label.toLowerCase()} (ej: un put a 12 meses en una ventana de 30 días aporta ~30/365 de su prima total). Los dividendos no se prorratean, se cuentan en su fecha exacta.`,
       body);
 
   } else if (field === 'realized') {
@@ -2701,17 +2844,18 @@ function showRoiDetail(field) {
       body);
 
   } else if (field === 'total') {
+    const unrealLabel = d.range.days === null ? 'P&L No Realizada (histórico completo)' : `P&L No Realizada (solo ${d.range.label.toLowerCase()})`;
     const body = `
       <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
         <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">Primas + Dividendos</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.periodPremium+d.periodDividends)}</td></tr>
         <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">P&L Realizada</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.periodRealized)}</td></tr>
-        <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">P&L No Realizada (hoy)</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.unrealizedToday)}</td></tr>
+        <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">${unrealLabel}</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.unrealizedPeriod)}</td></tr>
       </table>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
         <span style="font-weight:600;">Ganancia/Pérdida Total</span>
         <span style="font-weight:700;font-size:1.05rem;color:${d.periodTotal>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.periodTotal)}</span>
       </div>
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">Clic en "Primas+Dividendos", "P&L Realizada" o "P&L No Realizada" en el panel anterior para ver el detalle transaccional de cada componente.</p>`;
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">Clic en "Primas+Dividendos", "P&L Realizada" o "P&L No Realizada" en el panel anterior para ver el detalle transaccional de cada componente. Recuerda: la P&L no realizada aquí es SOLO el cambio de precio dentro de este período, no el acumulado desde que compraste cada posición.</p>`;
     openDetailModal('📈 Ganancia/Pérdida Total del Período',
       `Desglose de los tres componentes que forman el resultado total (${d.range.label}).`,
       body);
