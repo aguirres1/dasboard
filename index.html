@@ -304,6 +304,59 @@
     </div>
   </section>
 
+  <!-- Rentabilidad de la Rueda por Período -->
+  <section class="panel">
+    <h2 class="kpi-label">Rentabilidad de la Rueda <span class="kpi-info" onclick="showKpiInfo('roi-period')">?</span></h2>
+    <div class="muted" style="margin-bottom:0.8rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+        <select id="roi-period" style="font-size:0.8rem; padding:3px 6px;">
+          <option value="7d">Semanal (7 días)</option>
+          <option value="30d" selected>Mensual (30 días)</option>
+          <option value="90d">Trimestral (90 días)</option>
+          <option value="ytd">Year-to-Date</option>
+          <option value="365d">Últimos 365 días</option>
+          <option value="all">Todo el histórico</option>
+        </select>
+      </label>
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+        <input type="checkbox" id="roi-include-unrealized" checked>
+        <span>Incluir P&L no realizada de las acciones en cartera</span>
+      </label>
+    </div>
+    <div class="grid" id="roi-grid">
+      <div class="stat">
+        <div class="label">Capital operacional (base)</div>
+        <div class="value" id="roi-capital">$0.00</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Costo bruto de acciones en la rueda hoy</div>
+      </div>
+      <div class="stat green">
+        <div class="label">Primas + Dividendos (período)</div>
+        <div class="value" id="roi-premium">$0.00</div>
+      </div>
+      <div class="stat">
+        <div class="label">P&L Realizada (período)</div>
+        <div class="value" id="roi-realized">$0.00</div>
+      </div>
+      <div class="stat" id="roi-unrealized-card">
+        <div class="label">P&L No Realizada (hoy)</div>
+        <div class="value" id="roi-unrealized">$0.00</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">No tiene "período" — es la foto de hoy</div>
+      </div>
+      <div class="stat yellow">
+        <div class="label">Ganancia/Pérdida Total (período)</div>
+        <div class="value" id="roi-total">$0.00</div>
+      </div>
+      <div class="stat green">
+        <div class="label">Rentabilidad sobre capital</div>
+        <div class="value" id="roi-pct">0.00%</div>
+      </div>
+      <div class="stat green">
+        <div class="label">Rentabilidad anualizada</div>
+        <div class="value" id="roi-annual">0.00%</div>
+      </div>
+    </div>
+  </section>
+
   <!-- Ingreso manual -->
   <section class="panel">
     <details id="manual-details">
@@ -1013,6 +1066,7 @@ function recompute() {
   renderHistory();
   renderWheel(tickers);
   renderPremiumChart();
+  renderRoi(tickers);
 }
 
 // ----- Wheel Tracker + Detail Modal -----
@@ -1402,6 +1456,122 @@ function getPremiumRange() {
   }
   return { from: ymd(from), to: ymd(to), label };
 }
+
+function getRoiRange() {
+  const sel = document.getElementById('roi-period');
+  const preset = sel ? sel.value : '30d';
+  const today = new Date();
+  const ymd = (d) => d.toISOString().slice(0,10);
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const minus = (days) => { const d=new Date(today); d.setDate(d.getDate()-days+1); return d; };
+  let from, to, label, days;
+  switch (preset) {
+    case '7d':   from = minus(7);            to = today; label='Semanal (7d)';   days=7;   break;
+    case '30d':  from = minus(30);           to = today; label='Mensual (30d)';  days=30;  break;
+    case '90d':  from = minus(90);           to = today; label='Trimestral (90d)'; days=90; break;
+    case 'ytd':  from = startOfYear;         to = today; label='YTD';            days=Math.round((today-startOfYear)/86400000)+1; break;
+    case '365d': from = minus(365);          to = today; label='Últimos 365d';   days=365; break;
+    case 'all':  from = new Date(2000,0,1);  to = today; label='Todo el histórico'; days=null; break;
+    default: from = minus(30); to = today; label='Mensual (30d)'; days=30;
+  }
+  return { from: ymd(from), to: ymd(to), label, days };
+}
+
+function renderRoi(tickers) {
+  const grid = document.getElementById('roi-grid');
+  if (!grid) return;
+  const range = getRoiRange();
+  const includeUnrealized = document.getElementById('roi-include-unrealized')
+    ? document.getElementById('roi-include-unrealized').checked
+    : true;
+
+  // 1) Primas + dividendos del período, SOLO sobre tickers en la rueda
+  let periodPremium = 0;
+  let periodDividends = 0;
+  let periodRealized = 0;
+
+  for (const tx of filteredTransactions()) {
+    if (tx.date < range.from || tx.date > range.to) continue;
+    const opt = classifyOption(tx.symbol);
+    const underlying = opt ? opt.underlying : (tx.symbol || '').trim();
+    const t = tickers[underlying];
+    if (!t || !isInWheel(underlying, t)) continue;
+
+    const a = tx.action.toLowerCase();
+    if (a === 'sell to open' || a === 'buy to close') {
+      periodPremium += tx.amount;
+    } else if (/dividend/i.test(a)) {
+      periodDividends += tx.amount;
+    }
+  }
+
+  // 2) P&L realizada del período: aproximamos sumando realizedPL completo de tickers
+  //    con actividad de cierre/asignación dentro del rango (heurística: si tuvo
+  //    transacciones de Sell o Assigned-Call en el rango, atribuimos su realizedPL total)
+  for (const t of Object.values(tickers)) {
+    if (!isInWheel(t.ticker, t)) continue;
+    const hadCloseInRange = filteredTransactions().some(tx => {
+      const sym = (tx.symbol || '').trim();
+      const opt = classifyOption(sym);
+      const underlying = opt ? opt.underlying : sym;
+      if (underlying !== t.ticker) return false;
+      if (tx.date < range.from || tx.date > range.to) return false;
+      const a = tx.action.toLowerCase();
+      return a === 'sell' || a === 'assigned';
+    });
+    if (hadCloseInRange) periodRealized += t.realizedPL;
+  }
+
+  // 3) Capital operacional base = costo bruto de acciones HOY en tickers de la rueda
+  let capitalBase = 0;
+  let unrealizedToday = 0;
+  for (const t of Object.values(tickers)) {
+    if (!isInWheel(t.ticker, t)) continue;
+    if (t.shares >= 1) {
+      capitalBase += t.costGross;
+      const px = state.prices[t.ticker];
+      if (px) {
+        const avgCost = t.costGross / t.shares;
+        const adjCost = (t.costGross - t.premium - t.dividends) / t.shares;
+        unrealizedToday += (px - (adjCost || avgCost)) * Math.round(t.shares);
+      }
+    }
+  }
+  // Si no hay capital en acciones (todo en cash-secured puts), usamos el capital bloqueado en puts abiertos como base
+  if (capitalBase === 0) {
+    for (const t of Object.values(tickers)) {
+      if (!isInWheel(t.ticker, t)) continue;
+      for (const lot of t.openOptions) {
+        if (lot.type === 'P') capitalBase += lot.strike * lot.contracts * 100;
+      }
+    }
+  }
+
+  const periodTotal = periodPremium + periodDividends + periodRealized + (includeUnrealized ? unrealizedToday : 0);
+  const roiPct = capitalBase > 0 ? (periodTotal / capitalBase * 100) : 0;
+  const annualFactor = range.days ? (365 / range.days) : null;
+  const roiAnnual = annualFactor !== null ? roiPct * annualFactor : null;
+
+  const setVal = (id, val, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val;
+    if (cls) el.className = 'value ' + cls;
+  };
+
+  setVal('roi-capital', fmtMoney(capitalBase));
+  setVal('roi-premium', fmtMoney(periodPremium + periodDividends), (periodPremium+periodDividends)>=0?'pos':'neg');
+  setVal('roi-realized', fmtMoney(periodRealized), periodRealized>=0?'pos':'neg');
+  setVal('roi-unrealized', fmtMoney(unrealizedToday), unrealizedToday>=0?'pos':'neg');
+  setVal('roi-total', fmtMoney(periodTotal), periodTotal>=0?'pos':'neg');
+  setVal('roi-pct', roiPct.toFixed(2)+'%', roiPct>=0?'pos':'neg');
+  setVal('roi-annual', roiAnnual!==null ? roiAnnual.toFixed(2)+'%' : '—', (roiAnnual??0)>=0?'pos':'neg');
+
+  const unrealCard = document.getElementById('roi-unrealized-card');
+  if (unrealCard) unrealCard.style.opacity = includeUnrealized ? '1' : '0.4';
+}
+
+
 
 function renderKPIs(tickers) {
   const arr = Object.values(tickers);
@@ -1933,6 +2103,9 @@ document.getElementById('positions-show-all').addEventListener('change', recompu
   });
   applyBtn.addEventListener('click', recompute);
 })();
+// ROI by period wiring
+document.getElementById('roi-period').addEventListener('change', recompute);
+document.getElementById('roi-include-unrealized').addEventListener('change', recompute);
 document.getElementById('refresh-prices').addEventListener('click', () => refreshPrices({
   buttonId: 'refresh-prices',
   buttonLabel: '🔄 Actualizar precios (todos)',
@@ -2128,8 +2301,13 @@ const KPI_INFO = {
   },
   'wheel-unrealized': {
     title: 'P&L no realizada (solo la rueda)',
-    desc: 'Ganancia o pérdida no realizada calculada únicamente sobre las acciones que han participado en la estrategia de la rueda (aquellas sobre las que se ha vendido alguna opción). Excluye acciones de inversión pura como BRKB, LULU, VGT, etc.',
-    formula: 'Σ[(precio actual − costo real ajustado) × acciones]\nDonde costo real = (costo bruto − primas − dividendos) / acciones\nSolo tickers con hasOptionHistory = true'
+    desc: 'Ganancia o pérdida no realizada calculada únicamente sobre las acciones que han participado en la estrategia de la rueda (aquellas sobre las que se ha vendido alguna opción, o que marcaste manualmente). Excluye acciones de inversión pura como BRKB, LULU, VGT, etc.',
+    formula: 'Σ[(precio actual − costo real ajustado) × acciones]\nDonde costo real = (costo bruto − primas − dividendos) / acciones\nSolo tickers marcados como "en la rueda"'
+  },
+  'roi-period': {
+    title: 'Rentabilidad de la Rueda',
+    desc: 'Mide qué tan rentable ha sido la operación de la rueda en el período elegido (semanal, mensual, etc.), sobre el capital que tienes invertido HOY en esos activos. El checkbox "Incluir P&L no realizada" te deja decidir si el cambio de precio de las acciones que aún tienes cuenta como ganancia/pérdida del período, o si solo miras el ingreso de primas y lo ya realizado.',
+    formula: 'Total período = Primas+Dividendos(período) + P&L Realizada(período) + [P&L No Realizada(hoy) si está marcado]\nRentabilidad % = Total período / Capital operacional base\nAnualizada = Rentabilidad % × (365 / días del período)'
   }
 };
 
