@@ -251,9 +251,10 @@
   <section class="panel">
     <h2>Resumen General</h2>
     <div class="grid" id="kpi-grid">
-      <div class="stat green">
-        <div class="label kpi-label">Primas netas cobradas (total) <span class="kpi-info" onclick="showKpiInfo('premium-total')">?</span></div>
+      <div class="stat green" style="cursor:pointer;" onclick="showKpiDetail('premium-total')">
+        <div class="label kpi-label">Primas netas cobradas (total) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('premium-total')">?</span></div>
         <div class="value" id="kpi-premium">$0.00</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Clic para ver transacciones</div>
       </div>
       <div class="stat" style="min-width:240px;">
         <div class="label" style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
@@ -271,25 +272,28 @@
             <option value="custom">Personalizado…</option>
           </select>
         </div>
-        <div class="value" id="kpi-premium-month">$0.00</div>
-        <div class="muted" id="kpi-premium-range-detail" style="font-size:0.7rem; margin-top:2px;">—</div>
+        <div class="value" id="kpi-premium-month" style="cursor:pointer;" onclick="showKpiDetail('premium-range')">$0.00</div>
+        <div class="muted" id="kpi-premium-range-detail" style="font-size:0.7rem; margin-top:2px; cursor:pointer;" onclick="showKpiDetail('premium-range')">—</div>
         <div id="premium-range-custom" style="display:none; gap:0.3rem; margin-top:4px;">
           <input type="date" id="premium-from" style="font-size:0.75rem; padding:2px;">
           <input type="date" id="premium-to" style="font-size:0.75rem; padding:2px;">
           <button id="premium-apply" class="secondary" style="font-size:0.7rem; padding:2px 6px;">Aplicar</button>
         </div>
       </div>
-      <div class="stat">
-        <div class="label kpi-label">Posiciones de opción abiertas <span class="kpi-info" onclick="showKpiInfo('open-options')">?</span></div>
+      <div class="stat" style="cursor:pointer;" onclick="showKpiDetail('open-options')">
+        <div class="label kpi-label">Posiciones de opción abiertas <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('open-options')">?</span></div>
         <div class="value" id="kpi-open-options">0</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Clic para ver detalle</div>
       </div>
-      <div class="stat yellow">
-        <div class="label kpi-label">En riesgo de asignación (ITM) <span class="kpi-info" onclick="showKpiInfo('itm')">?</span></div>
+      <div class="stat yellow" style="cursor:pointer;" onclick="showKpiDetail('itm')">
+        <div class="label kpi-label">En riesgo de asignación (ITM) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('itm')">?</span></div>
         <div class="value" id="kpi-itm">0</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Clic para ver detalle</div>
       </div>
-      <div class="stat">
-        <div class="label kpi-label">Tickers con acciones <span class="kpi-info" onclick="showKpiInfo('tickers')">?</span></div>
+      <div class="stat" style="cursor:pointer;" onclick="showKpiDetail('tickers')">
+        <div class="label kpi-label">Tickers con acciones <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('tickers')">?</span></div>
         <div class="value" id="kpi-tickers">0</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Clic para ver detalle</div>
       </div>
       <div class="stat">
         <div class="label kpi-label">Última actualización de precios <span class="kpi-info" onclick="showKpiInfo('prices-time')">?</span></div>
@@ -324,34 +328,36 @@
       </label>
     </div>
     <div class="grid" id="roi-grid">
-      <div class="stat">
-        <div class="label">Capital operacional (base)</div>
+      <div class="stat" style="cursor:pointer;" onclick="showRoiDetail('capital')">
+        <div class="label">Capital operacional (base) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('roi-capital')">?</span></div>
         <div class="value" id="roi-capital">$0.00</div>
-        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Costo bruto de acciones en la rueda hoy</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Acciones + capital en puts abiertos · Clic para detalle</div>
       </div>
-      <div class="stat green">
-        <div class="label">Primas + Dividendos (período)</div>
+      <div class="stat green" style="cursor:pointer;" onclick="showRoiDetail('premium')">
+        <div class="label">Primas + Dividendos (período) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('roi-premium')">?</span></div>
         <div class="value" id="roi-premium">$0.00</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Clic para ver transacciones</div>
       </div>
-      <div class="stat">
-        <div class="label">P&L Realizada (período)</div>
+      <div class="stat" style="cursor:pointer;" onclick="showRoiDetail('realized')">
+        <div class="label">P&L Realizada (período) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('roi-realized')">?</span></div>
         <div class="value" id="roi-realized">$0.00</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Clic para ver transacciones</div>
       </div>
-      <div class="stat" id="roi-unrealized-card">
-        <div class="label">P&L No Realizada (hoy)</div>
+      <div class="stat" id="roi-unrealized-card" style="cursor:pointer;" onclick="showWheelUnrealizedBreakdown()">
+        <div class="label">P&L No Realizada (hoy) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('roi-unrealized')">?</span></div>
         <div class="value" id="roi-unrealized">$0.00</div>
-        <div class="muted" style="font-size:0.7rem; margin-top:2px;">No tiene "período" — es la foto de hoy</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">No tiene "período" — es la foto de hoy · Clic para detalle</div>
       </div>
-      <div class="stat yellow">
-        <div class="label">Ganancia/Pérdida Total (período)</div>
+      <div class="stat yellow" style="cursor:pointer;" onclick="showRoiDetail('total')">
+        <div class="label">Ganancia/Pérdida Total (período) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('roi-total')">?</span></div>
         <div class="value" id="roi-total">$0.00</div>
       </div>
       <div class="stat green">
-        <div class="label">Rentabilidad sobre capital</div>
+        <div class="label">Rentabilidad sobre capital <span class="kpi-info" onclick="showKpiInfo('roi-pct')">?</span></div>
         <div class="value" id="roi-pct">0.00%</div>
       </div>
       <div class="stat green">
-        <div class="label">Rentabilidad anualizada</div>
+        <div class="label">Rentabilidad anualizada <span class="kpi-info" onclick="showKpiInfo('roi-annual')">?</span></div>
         <div class="value" id="roi-annual">0.00%</div>
       </div>
     </div>
@@ -1490,6 +1496,9 @@ function renderRoi(tickers) {
   let periodDividends = 0;
   let periodRealized = 0;
 
+  const premiumTxs = [];
+  const dividendTxs = [];
+
   for (const tx of filteredTransactions()) {
     if (tx.date < range.from || tx.date > range.to) continue;
     const opt = classifyOption(tx.symbol);
@@ -1500,17 +1509,21 @@ function renderRoi(tickers) {
     const a = tx.action.toLowerCase();
     if (a === 'sell to open' || a === 'buy to close') {
       periodPremium += tx.amount;
+      premiumTxs.push(tx);
     } else if (/dividend/i.test(a)) {
       periodDividends += tx.amount;
+      dividendTxs.push(tx);
     }
   }
 
   // 2) P&L realizada del período: aproximamos sumando realizedPL completo de tickers
   //    con actividad de cierre/asignación dentro del rango (heurística: si tuvo
   //    transacciones de Sell o Assigned-Call en el rango, atribuimos su realizedPL total)
+  const realizedTxs = [];
+  const realizedByTicker = [];
   for (const t of Object.values(tickers)) {
     if (!isInWheel(t.ticker, t)) continue;
-    const hadCloseInRange = filteredTransactions().some(tx => {
+    const closesInRange = filteredTransactions().filter(tx => {
       const sym = (tx.symbol || '').trim();
       const opt = classifyOption(sym);
       const underlying = opt ? opt.underlying : sym;
@@ -1519,35 +1532,54 @@ function renderRoi(tickers) {
       const a = tx.action.toLowerCase();
       return a === 'sell' || a === 'assigned';
     });
-    if (hadCloseInRange) periodRealized += t.realizedPL;
+    if (closesInRange.length > 0) {
+      periodRealized += t.realizedPL;
+      realizedTxs.push(...closesInRange);
+      realizedByTicker.push({ ticker: t.ticker, realizedPL: t.realizedPL, txs: closesInRange });
+    }
   }
 
-  // 3) Capital operacional base = costo bruto de acciones HOY en tickers de la rueda
+  // 3) Capital operacional base:
+  //    a) Costo bruto de acciones HOY en tickers de la rueda
+  //    b) + Capital bloqueado en TODOS los puts vendidos abiertos (cash-secured puts),
+  //       sin importar si ese mismo ticker también tiene acciones — son capitales distintos.
   let capitalBase = 0;
   let unrealizedToday = 0;
+  const roiBreakdown = { shares: [], puts: [] }; // para el detalle al hacer clic
+
   for (const t of Object.values(tickers)) {
     if (!isInWheel(t.ticker, t)) continue;
+
     if (t.shares >= 1) {
       capitalBase += t.costGross;
       const px = state.prices[t.ticker];
+      let u = null;
       if (px) {
         const avgCost = t.costGross / t.shares;
         const adjCost = (t.costGross - t.premium - t.dividends) / t.shares;
-        unrealizedToday += (px - (adjCost || avgCost)) * Math.round(t.shares);
+        u = (px - (adjCost || avgCost)) * Math.round(t.shares);
+        unrealizedToday += u;
+      }
+      roiBreakdown.shares.push({ ticker: t.ticker, shares: Math.round(t.shares), costGross: t.costGross, unrealized: u });
+    }
+
+    for (const lot of t.openOptions) {
+      if (lot.type === 'P') {
+        const cap = lot.strike * lot.contracts * 100;
+        capitalBase += cap;
+        roiBreakdown.puts.push({ ticker: t.ticker, strike: lot.strike, contracts: lot.contracts, expiration: lot.expiration, capital: cap });
       }
     }
   }
-  // Si no hay capital en acciones (todo en cash-secured puts), usamos el capital bloqueado en puts abiertos como base
-  if (capitalBase === 0) {
-    for (const t of Object.values(tickers)) {
-      if (!isInWheel(t.ticker, t)) continue;
-      for (const lot of t.openOptions) {
-        if (lot.type === 'P') capitalBase += lot.strike * lot.contracts * 100;
-      }
-    }
-  }
+  window.__roiBreakdown = {
+    ...roiBreakdown,
+    range,
+    capitalBase, unrealizedToday, periodPremium, periodDividends, periodRealized, periodTotal,
+    premiumTxs, dividendTxs, realizedByTicker
+  };
 
   const periodTotal = periodPremium + periodDividends + periodRealized + (includeUnrealized ? unrealizedToday : 0);
+  window.__roiBreakdown.periodTotal = periodTotal;
   const roiPct = capitalBase > 0 ? (periodTotal / capitalBase * 100) : 0;
   const annualFactor = range.days ? (365 / range.days) : null;
   const roiAnnual = annualFactor !== null ? roiPct * annualFactor : null;
@@ -1584,6 +1616,12 @@ function renderKPIs(tickers) {
   let wheelUnrealized = 0;
   let wheelCapital = 0;
 
+  const totalPremiumTxs = [];
+  const rangePremiumTxs = [];
+  const openOptionsList = [];
+  const itmList = [];
+  const tickersWithSharesList = [];
+
   const range = getPremiumRange();
   for (const tx of filteredTransactions()) {
     const opt = classifyOption(tx.symbol);
@@ -1591,20 +1629,28 @@ function renderKPIs(tickers) {
     const a = tx.action.toLowerCase();
     if (a==='sell to open' || a==='buy to close') {
       totalPremium += tx.amount;
+      totalPremiumTxs.push(tx);
       if (tx.date >= range.from && tx.date <= range.to) {
         rangePremium += tx.amount;
         rangeContracts += Math.abs(tx.quantity || 0);
+        rangePremiumTxs.push(tx);
       }
     }
   }
   for (const t of arr) {
     openCount += t.openOptions.length;
-    if (t.shares>0) tickersWithShares++;
+    for (const lot of t.openOptions) {
+      openOptionsList.push({ ticker: t.ticker, type: lot.type, strike: lot.strike, expiration: lot.expiration, contracts: lot.contracts, premiumNet: lot.premiumNet });
+    }
+    if (t.shares>0) {
+      tickersWithShares++;
+      tickersWithSharesList.push({ ticker: t.ticker, shares: Math.round(t.shares), costGross: t.costGross });
+    }
     const px = state.prices[t.ticker];
     if (px) {
       for (const lot of t.openOptions) {
-        if (lot.type==='C' && px > lot.strike) itmCount++;
-        if (lot.type==='P' && px < lot.strike) itmCount++;
+        if (lot.type==='C' && px > lot.strike) { itmCount++; itmList.push({ ticker: t.ticker, type:'CALL', strike: lot.strike, expiration: lot.expiration, px }); }
+        if (lot.type==='P' && px < lot.strike) { itmCount++; itmList.push({ ticker: t.ticker, type:'PUT', strike: lot.strike, expiration: lot.expiration, px }); }
       }
     }
     // P&L no realizada SOLO de acciones en la rueda (con override manual o historial de opciones)
@@ -1615,6 +1661,11 @@ function renderKPIs(tickers) {
       wheelCapital += t.costGross;
     }
   }
+
+  window.__kpiBreakdown = {
+    range, totalPremium, rangePremium, totalPremiumTxs, rangePremiumTxs,
+    openOptionsList, itmList, tickersWithSharesList
+  };
 
   document.getElementById('kpi-premium').textContent = fmtMoney(totalPremium);
   document.getElementById('kpi-premium-month').textContent = fmtMoney(rangePremium);
@@ -2308,6 +2359,41 @@ const KPI_INFO = {
     title: 'Rentabilidad de la Rueda',
     desc: 'Mide qué tan rentable ha sido la operación de la rueda en el período elegido (semanal, mensual, etc.), sobre el capital que tienes invertido HOY en esos activos. El checkbox "Incluir P&L no realizada" te deja decidir si el cambio de precio de las acciones que aún tienes cuenta como ganancia/pérdida del período, o si solo miras el ingreso de primas y lo ya realizado.',
     formula: 'Total período = Primas+Dividendos(período) + P&L Realizada(período) + [P&L No Realizada(hoy) si está marcado]\nRentabilidad % = Total período / Capital operacional base\nAnualizada = Rentabilidad % × (365 / días del período)'
+  },
+  'roi-capital': {
+    title: 'Capital operacional (base)',
+    desc: 'Todo el capital que tienes comprometido HOY en la rueda: el costo bruto de las acciones que ya posees en tickers de la rueda, MÁS el capital que queda bloqueado como garantía en cada put vendido y aún abierto (cash-secured puts), sin importar el plazo de vencimiento. Por eso incluye también puts de largo plazo como TSLA o NVDA.',
+    formula: 'Σ(costo bruto de acciones en la rueda) + Σ(strike × contratos × 100) de cada PUT abierto'
+  },
+  'roi-premium': {
+    title: 'Primas + Dividendos (período)',
+    desc: 'Suma de las primas netas (Sell to Open menos Buy to Close) y los dividendos cobrados, solo de transacciones dentro del período seleccionado y solo de tickers marcados como parte de la rueda.',
+    formula: 'Σ(Sell to Open − Buy to Close) + Σ(Dividendos) en el rango de fechas'
+  },
+  'roi-realized': {
+    title: 'P&L Realizada (período)',
+    desc: 'Ganancia o pérdida ya cristalizada en el período: ocurre cuando vendes acciones o te asignan una call y sales de la posición. Se atribuye el realizedPL completo de un ticker al período si tuvo algún cierre (Sell o Assigned) dentro de esas fechas.',
+    formula: 'Σ(realizedPL del ticker) si tuvo un cierre dentro del rango de fechas'
+  },
+  'roi-unrealized': {
+    title: 'P&L No Realizada (hoy)',
+    desc: 'Es la fotografía de HOY, no tiene "período" — muestra cuánto ganarías o perderías si vendieras ahora mismo las acciones que tienes en la rueda, al precio actual, comparado contra tu costo real ajustado (ya descontando primas y dividendos cobrados sobre esa posición).',
+    formula: 'Σ[(precio actual − costo real ajustado) × acciones] de tickers en la rueda'
+  },
+  'roi-total': {
+    title: 'Ganancia/Pérdida Total (período)',
+    desc: 'El resultado neto de la operación en el período: suma las primas y dividendos cobrados, lo ya realizado, y (si lo marcaste) la P&L no realizada de hoy.',
+    formula: 'Primas+Dividendos(período) + P&L Realizada(período) + [P&L No Realizada(hoy) si está marcado]'
+  },
+  'roi-pct': {
+    title: 'Rentabilidad sobre capital',
+    desc: 'La Ganancia/Pérdida Total del período expresada como porcentaje sobre el capital operacional base. Es la métrica más directa de "qué tanto rendiste" en ese período.',
+    formula: 'Ganancia/Pérdida Total ÷ Capital operacional base × 100'
+  },
+  'roi-annual': {
+    title: 'Rentabilidad anualizada',
+    desc: 'Proyecta la rentabilidad del período a una base anual de 365 días, para poder comparar períodos de distinta duración en igualdad de condiciones (ej. comparar tu rendimiento semanal contra el mensual).',
+    formula: 'Rentabilidad % × (365 ÷ días del período)\nNo aplica para "Todo el histórico" (no tiene una duración fija comparable)'
   }
 };
 
@@ -2398,6 +2484,238 @@ function showWheelUnrealizedBreakdown() {
       </div>
     </div>`;
   modal.style.display = 'flex';
+}
+
+function openDetailModal(title, subtitle, bodyHtml) {
+  let modal = document.getElementById('kpi-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kpi-modal';
+    modal.className = 'kpi-modal';
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="kpi-modal-box" style="max-width:640px;">
+      <button class="kpi-modal-close" onclick="document.getElementById('kpi-modal').style.display='none'">✕</button>
+      <h3>${title}</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 0.8rem;">${subtitle}</p>
+      ${bodyHtml}
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+function txTableHtml(txs) {
+  if (!txs || !txs.length) return `<div style="color:var(--muted);text-align:center;padding:1rem;">Sin transacciones en este rango.</div>`;
+  const rows = txs.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(tx => `
+    <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+      <td style="padding:5px 8px;">${tx.date}</td>
+      <td style="padding:5px 8px;">${tx.action}</td>
+      <td style="padding:5px 8px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${tx.symbol}">${tx.symbol}</td>
+      <td style="padding:5px 8px;text-align:right;">${tx.quantity ?? ''}</td>
+      <td style="padding:5px 8px;text-align:right;font-weight:600;color:${(tx.amount||0)>=0?'var(--green)':'var(--red)'};">${fmtMoney(tx.amount)}</td>
+    </tr>`).join('');
+  return `
+    <div style="max-height:340px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+        <thead><tr style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+          <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Fecha</th>
+          <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Acción</th>
+          <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Símbolo</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Qty</th>
+          <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Importe</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function showKpiDetail(field) {
+  const d = window.__kpiBreakdown;
+  if (!d) return;
+
+  if (field === 'premium-total') {
+    const body = txTableHtml(d.totalPremiumTxs) + `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Total primas netas (histórico completo)</span>
+        <span style="font-weight:700;font-size:1.05rem;color:${d.totalPremium>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.totalPremium)}</span>
+      </div>`;
+    openDetailModal('💰 Primas Netas Cobradas (Total)',
+      'Todas las transacciones de Sell to Open y Buy to Close desde el inicio del historial.',
+      body);
+
+  } else if (field === 'premium-range') {
+    const body = txTableHtml(d.rangePremiumTxs) + `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Total primas (${d.range.label})</span>
+        <span style="font-weight:700;font-size:1.05rem;color:${d.rangePremium>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.rangePremium)}</span>
+      </div>`;
+    openDetailModal('💰 Primas en Rango Seleccionado',
+      `Transacciones de Sell to Open y Buy to Close entre ${d.range.from} y ${d.range.to}.`,
+      body);
+
+  } else if (field === 'open-options') {
+    const rows = d.openOptionsList.map(o => `
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+        <td style="padding:5px 8px;font-weight:600;">${o.ticker}</td>
+        <td style="padding:5px 8px;">${o.type==='C'?'CALL':'PUT'}</td>
+        <td style="padding:5px 8px;text-align:right;">$${o.strike}</td>
+        <td style="padding:5px 8px;">${o.expiration}</td>
+        <td style="padding:5px 8px;text-align:right;">${o.contracts}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:600;color:${o.premiumNet>=0?'var(--green)':'var(--red)'};">${fmtMoney(o.premiumNet)}</td>
+      </tr>`).join('');
+    const body = d.openOptionsList.length ? `
+      <div style="max-height:340px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead><tr style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Ticker</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Tipo</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Strike</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Vencimiento</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Contratos</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Prima neta</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : `<div style="color:var(--muted);text-align:center;padding:1rem;">Sin opciones abiertas actualmente.</div>`;
+    openDetailModal('📋 Posiciones de Opción Abiertas',
+      'Todos los contratos vendidos (Sell to Open) que aún no se han cerrado, expirado o asignado.',
+      body);
+
+  } else if (field === 'itm') {
+    const rows = d.itmList.map(o => `
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+        <td style="padding:5px 8px;font-weight:600;">${o.ticker}</td>
+        <td style="padding:5px 8px;">${o.type}</td>
+        <td style="padding:5px 8px;text-align:right;">$${o.strike}</td>
+        <td style="padding:5px 8px;">${o.expiration}</td>
+        <td style="padding:5px 8px;text-align:right;">$${o.px.toFixed(2)}</td>
+      </tr>`).join('');
+    const body = d.itmList.length ? `
+      <div style="max-height:340px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead><tr style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Ticker</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Tipo</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Strike</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Vencimiento</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Precio actual</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : `<div style="color:var(--muted);text-align:center;padding:1rem;">Ninguna opción está ITM con los precios actuales.</div>`;
+    openDetailModal('⚠️ Opciones En Riesgo de Asignación (ITM)',
+      'CALL en riesgo: precio actual > strike. PUT en riesgo: precio actual < strike.',
+      body);
+
+  } else if (field === 'tickers') {
+    const rows = d.tickersWithSharesList.map(t => `
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+        <td style="padding:5px 8px;font-weight:600;">${t.ticker}</td>
+        <td style="padding:5px 8px;text-align:right;">${t.shares}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmtMoney(t.costGross)}</td>
+      </tr>`).join('');
+    const body = d.tickersWithSharesList.length ? `
+      <div style="max-height:340px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead><tr style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Ticker</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Acciones</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Costo bruto</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : `<div style="color:var(--muted);text-align:center;padding:1rem;">Sin acciones en cartera actualmente.</div>`;
+    openDetailModal('📦 Tickers con Acciones en Cartera',
+      'Todos los activos donde tienes al menos 1 acción, sin importar si participan en la rueda.',
+      body);
+  }
+}
+
+function showRoiDetail(field) {
+  const d = window.__roiBreakdown;
+  if (!d) return;
+
+  if (field === 'capital') {
+    const sharesRows = d.shares.map(s => `
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+        <td style="padding:5px 8px;font-weight:600;">${s.ticker}</td>
+        <td style="padding:5px 8px;">Acciones en cartera</td>
+        <td style="padding:5px 8px;text-align:right;">${s.shares}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmtMoney(s.costGross)}</td>
+      </tr>`).join('');
+    const putRows = d.puts.map(p => `
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+        <td style="padding:5px 8px;font-weight:600;">${p.ticker}</td>
+        <td style="padding:5px 8px;">PUT $${p.strike} vto. ${p.expiration} (${p.contracts} contrato${p.contracts>1?'s':''})</td>
+        <td style="padding:5px 8px;text-align:right;">—</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmtMoney(p.capital)}</td>
+      </tr>`).join('');
+    const body = `
+      <div style="max-height:380px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead><tr style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Ticker</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Concepto</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Cant.</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Capital</th>
+          </tr></thead>
+          <tbody>${sharesRows}${putRows}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Total capital operacional</span>
+        <span style="font-weight:700;font-size:1.05rem;">${fmtMoney(d.capitalBase)}</span>
+      </div>`;
+    openDetailModal('💰 Composición del Capital Operacional',
+      'Acciones que ya tienes en la rueda + capital bloqueado en cada PUT vendido y aún abierto (incluye vencimientos de largo plazo).',
+      body);
+
+  } else if (field === 'premium') {
+    const allTxs = [...d.premiumTxs, ...d.dividendTxs];
+    const body = txTableHtml(allTxs) + `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Total primas + dividendos (${d.range.label})</span>
+        <span style="font-weight:700;font-size:1.05rem;color:${(d.periodPremium+d.periodDividends)>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.periodPremium+d.periodDividends)}</span>
+      </div>`;
+    openDetailModal('💵 Primas y Dividendos del Período',
+      `Transacciones de Sell to Open, Buy to Close y dividendos entre ${d.range.from} y ${d.range.to}, solo tickers en la rueda.`,
+      body);
+
+  } else if (field === 'realized') {
+    const groups = d.realizedByTicker.map(g => `
+      <div style="margin-bottom:0.8rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.3rem;">
+          <strong style="font-size:0.85rem;">${g.ticker}</strong>
+          <span style="font-weight:600;color:${g.realizedPL>=0?'var(--green)':'var(--red)'};">${fmtMoney(g.realizedPL)}</span>
+        </div>
+        ${txTableHtml(g.txs)}
+      </div>`).join('');
+    const body = (d.realizedByTicker.length ? groups : `<div style="color:var(--muted);text-align:center;padding:1rem;">Sin cierres (Sell/Assigned) en este rango.</div>`) + `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Total P&L Realizada (${d.range.label})</span>
+        <span style="font-weight:700;font-size:1.05rem;color:${d.periodRealized>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.periodRealized)}</span>
+      </div>`;
+    openDetailModal('✅ P&L Realizada del Período',
+      `Tickers con un cierre (venta de acciones o asignación de call) entre ${d.range.from} y ${d.range.to}, con su realizedPL total atribuido.`,
+      body);
+
+  } else if (field === 'total') {
+    const body = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+        <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">Primas + Dividendos</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.periodPremium+d.periodDividends)}</td></tr>
+        <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">P&L Realizada</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.periodRealized)}</td></tr>
+        <tr style="border-bottom:1px solid rgba(71,85,105,0.4);"><td style="padding:6px 8px;">P&L No Realizada (hoy)</td><td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(d.unrealizedToday)}</td></tr>
+      </table>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Ganancia/Pérdida Total</span>
+        <span style="font-weight:700;font-size:1.05rem;color:${d.periodTotal>=0?'var(--green)':'var(--red)'};">${fmtMoney(d.periodTotal)}</span>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">Clic en "Primas+Dividendos", "P&L Realizada" o "P&L No Realizada" en el panel anterior para ver el detalle transaccional de cada componente.</p>`;
+    openDetailModal('📈 Ganancia/Pérdida Total del Período',
+      `Desglose de los tres componentes que forman el resultado total (${d.range.label}).`,
+      body);
+  }
 }
 
 // ----- Wheel Settings Sync (sincroniza selecciones a Sheets) -----
