@@ -296,10 +296,10 @@
         <div class="value" id="kpi-prices-time" style="font-size:1rem;">—</div>
         <div class="muted" id="price-status" style="font-size:0.7rem; margin-top:4px;"></div>
       </div>
-      <div class="stat">
-        <div class="label kpi-label">P&L no realizada (solo la rueda) <span class="kpi-info" onclick="showKpiInfo('wheel-unrealized')">?</span></div>
+      <div class="stat" id="kpi-wheel-unrealized-card" style="cursor:pointer;" onclick="showWheelUnrealizedBreakdown()">
+        <div class="label kpi-label">P&L no realizada (solo la rueda) <span class="kpi-info" onclick="event.stopPropagation(); showKpiInfo('wheel-unrealized')">?</span></div>
         <div class="value" id="kpi-wheel-unrealized">—</div>
-        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Solo acciones con opciones operadas</div>
+        <div class="muted" style="font-size:0.7rem; margin-top:2px;">Solo acciones con opciones operadas · Clic para ver detalle</div>
       </div>
     </div>
   </section>
@@ -2150,6 +2150,74 @@ function showKpiInfo(key) {
       <h3>ℹ️ ${info.title}</h3>
       <p style="font-size:0.85rem;color:var(--muted);margin:0 0 0.5rem;">${info.desc}</p>
       <div class="formula">${info.formula.replace(/\n/g,'<br>')}</div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+function showWheelUnrealizedBreakdown() {
+  const tickers = aggregate();
+  const rows = [];
+  let total = 0;
+
+  for (const t of Object.values(tickers)) {
+    if (!isInWheel(t.ticker, t)) continue;
+    const px = state.prices[t.ticker];
+    const hasShares = t.shares >= 1;
+    if (!hasShares || !px) continue;
+    const avgCost  = t.costGross / t.shares;
+    const adjCost  = (t.costGross - t.premium - t.dividends) / t.shares;
+    const costUsed = adjCost || avgCost;
+    const shares   = Math.round(t.shares);
+    const unrealized = (px - costUsed) * shares;
+    total += unrealized;
+    rows.push({ ticker: t.ticker, shares, costUsed, px, unrealized });
+  }
+
+  rows.sort((a,b) => a.unrealized - b.unrealized); // peores primero
+
+  let modal = document.getElementById('kpi-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kpi-modal';
+    modal.className = 'kpi-modal';
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+
+  const rowsHtml = rows.length ? rows.map(r => `
+    <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+      <td style="padding:5px 8px;font-weight:600;">${r.ticker}</td>
+      <td style="padding:5px 8px;text-align:right;">${r.shares}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmtMoney(r.costUsed)}</td>
+      <td style="padding:5px 8px;text-align:right;">$${r.px.toFixed(2)}</td>
+      <td style="padding:5px 8px;text-align:right;font-weight:600;color:${r.unrealized>=0?'var(--green)':'var(--red)'};">${fmtMoney(r.unrealized)}</td>
+    </tr>`).join('') : `<tr><td colspan="5" style="padding:10px 8px;color:var(--muted);text-align:center;">Sin posiciones con precio disponible en la rueda.</td></tr>`;
+
+  modal.innerHTML = `
+    <div class="kpi-modal-box" style="max-width:600px;">
+      <button class="kpi-modal-close" onclick="document.getElementById('kpi-modal').style.display='none'">✕</button>
+      <h3>📊 Composición de la P&L No Realizada (rueda)</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:0 0 0.8rem;">
+        Por ticker: (precio actual − costo real ajustado) × acciones. Solo se incluyen activos marcados como parte de la rueda con precio disponible.
+      </p>
+      <div style="max-height:340px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+          <thead>
+            <tr style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;">
+              <th style="text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);">Ticker</th>
+              <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Acciones</th>
+              <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Costo real/acc</th>
+              <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">Precio actual</th>
+              <th style="text-align:right;padding:5px 8px;border-bottom:1px solid var(--border);">P&L no realizada</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);">
+        <span style="font-weight:600;">Total</span>
+        <span style="font-weight:700;font-size:1.05rem;color:${total>=0?'var(--green)':'var(--red)'};">${fmtMoney(total)}</span>
+      </div>
     </div>`;
   modal.style.display = 'flex';
 }
