@@ -164,6 +164,11 @@
   .dte-urgent { color: var(--red); font-weight: 700; }
   .dte-warn { color: var(--yellow); font-weight: 600; }
 
+  /* ---- Expired options filter buttons ---- */
+  .expired-filter-btn { background:var(--panel-2); color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:4px 12px; font-size:0.78rem; cursor:pointer; transition:all 0.15s; }
+  .expired-filter-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .expired-filter-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+
   /* ---- KPI Tooltips ---- */
   .kpi-label { display:flex; align-items:center; gap:5px; }
   .kpi-info { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:var(--panel-2); color:var(--muted); font-size:10px; cursor:pointer; border:1px solid var(--border); flex-shrink:0; transition:background 0.15s; }
@@ -555,6 +560,40 @@
       </table>
     </div>
     <div class="empty" id="open-options-empty">Aún no hay opciones abiertas. Carga un CSV de Schwab para empezar.</div>
+  </section>
+
+  <!-- Opciones Vencidas / Cerradas -->
+  <section class="panel">
+    <h2>📅 Opciones Vencidas y Cerradas</h2>
+    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem; flex-wrap:wrap;">
+      <div style="display:flex; gap:0.4rem;">
+        <button class="expired-filter-btn active" data-days="7" onclick="setExpiredFilter(7)">Últimos 7d</button>
+        <button class="expired-filter-btn" data-days="15" onclick="setExpiredFilter(15)">Últimos 15d</button>
+        <button class="expired-filter-btn" data-days="30" onclick="setExpiredFilter(30)">Últimos 30d</button>
+        <button class="expired-filter-btn" data-days="90" onclick="setExpiredFilter(90)">Últimos 90d</button>
+        <button class="expired-filter-btn" data-days="0" onclick="setExpiredFilter(0)">Todo</button>
+      </div>
+      <div id="expired-summary" style="font-size:0.8rem; color:var(--muted);"></div>
+    </div>
+    <div class="scroll-x">
+      <table id="expired-options-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Tipo</th>
+            <th>Strike</th>
+            <th>Vencimiento</th>
+            <th>Fecha cierre</th>
+            <th>Contratos</th>
+            <th>Prima cobrada</th>
+            <th>Resultado</th>
+            <th>P&L</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="expired-options-empty">Sin opciones vencidas o cerradas en este período.</div>
   </section>
 
   <!-- Resumen por ticker -->
@@ -1069,6 +1108,7 @@ function recompute() {
   renderKPIs(tickers);
   renderOpenOptions(tickers);
   renderPositions(tickers);
+  renderExpiredOptions();
   renderHistory();
   renderWheel(tickers);
   renderPremiumChart();
@@ -1666,8 +1706,9 @@ async function renderRoi(tickers) {
     for (const lot of t.openOptions) {
       if (lot.type === 'P') {
         const cap = lot.strike * lot.contracts * 100;
-        capitalBase += cap;
-        roiBreakdown.puts.push({ ticker: t.ticker, strike: lot.strike, contracts: lot.contracts, expiration: lot.expiration, capital: cap });
+        // Puts se excluyen del capital base — usan margen de la cuenta como garantía
+        // pero sin costo financiero si no se ejercen. Solo se registran para el detalle.
+        roiBreakdown.puts.push({ ticker: t.ticker, strike: lot.strike, contracts: lot.contracts, expiration: lot.expiration, capital: cap, note: 'Excluido del capital (margen sin costo)' });
       }
     }
   }
@@ -1948,6 +1989,110 @@ function renderPositions(tickers) {
   tbody.querySelectorAll('.wheel-toggle').forEach(cb => {
     cb.addEventListener('change', () => toggleWheelTicker(cb.dataset.ticker, cb.checked));
   });
+}
+
+let __expiredFilterDays = 7;
+
+function setExpiredFilter(days) {
+  __expiredFilterDays = days;
+  document.querySelectorAll('.expired-filter-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.days) === days);
+  });
+  renderExpiredOptions();
+}
+
+function renderExpiredOptions() {
+  const tbody = document.querySelector('#expired-options-table tbody');
+  const empty = document.getElementById('expired-options-empty');
+  const summary = document.getElementById('expired-summary');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const today = new Date().toISOString().slice(0,10);
+  const cutoff = __expiredFilterDays > 0
+    ? new Date(Date.now() - __expiredFilterDays * 86400000).toISOString().slice(0,10)
+    : '2000-01-01';
+
+  const OPTION_RE = /^([A-Z]{1,5})\s+(\d{2})\/(\d{2})\/(\d{4})\s+([\d.]+)\s+([CP])$/;
+
+  // Build a map of all option contracts from transactions
+  const contracts = {}; // key -> { ticker, type, strike, expiration, openDate, closeDate, action, premium, contracts }
+  for (const tx of filteredTransactions()) {
+    const m = OPTION_RE.exec((tx.symbol || '').trim());
+    if (!m) continue;
+    const ticker = m[1], type = m[6], strike = parseFloat(m[5]);
+    const expiration = `${m[4]}-${m[2]}-${m[3]}`;
+    const key = `${ticker}|${type}|${strike}|${expiration}`;
+    if (!contracts[key]) {
+      contracts[key] = { ticker, type, strike, expiration, openDate: null, closeDate: null, closeAction: null, premium: 0, qty: 0 };
+    }
+    const c = contracts[key];
+    const a = tx.action.toLowerCase();
+    if (a === 'sell to open') {
+      c.premium += tx.amount;
+      c.qty = Math.abs(tx.quantity || 1);
+      if (!c.openDate || tx.date < c.openDate) c.openDate = tx.date;
+    } else if (a === 'buy to close') {
+      c.premium += tx.amount; // negative amount reduces premium
+      if (!c.closeDate || tx.date > c.closeDate) { c.closeDate = tx.date; c.closeAction = 'buy to close'; }
+    } else if (a === 'expired') {
+      if (!c.closeDate || tx.date > c.closeDate) { c.closeDate = tx.date; c.closeAction = 'expired'; }
+    } else if (a === 'assigned') {
+      if (!c.closeDate || tx.date > c.closeDate) { c.closeDate = tx.date; c.closeAction = 'assigned'; }
+    }
+  }
+
+  // Auto-expire: if expiration < today and no close recorded, it expired worthless
+  for (const c of Object.values(contracts)) {
+    if (!c.closeDate && c.expiration < today) {
+      c.closeDate = c.expiration;
+      c.closeAction = 'expired';
+    }
+  }
+
+  // Filter: only closed/expired contracts within the window
+  const rows = Object.values(contracts).filter(c => {
+    if (!c.closeDate) return false; // still open
+    if (c.closeDate < cutoff) return false; // outside window
+    return true;
+  }).sort((a,b) => b.closeDate.localeCompare(a.closeDate));
+
+  if (rows.length === 0) {
+    if (empty) empty.style.display = 'block';
+    if (summary) summary.textContent = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  // Summary stats
+  const totalPremium = rows.reduce((s,r) => s + r.premium, 0);
+  const assigned = rows.filter(r => r.closeAction === 'assigned').length;
+  const closed = rows.filter(r => r.closeAction === 'buy to close').length;
+  const expired = rows.filter(r => r.closeAction === 'expired').length;
+  if (summary) summary.textContent = `${rows.length} contratos · Prima total: ${fmtMoney(totalPremium)} · Expiradas sin valor: ${expired} · Asignadas: ${assigned} · Cerradas anticipadamente: ${closed}`;
+
+  const resultLabel = {
+    'expired': { label: 'Expiró sin valor ✅', cls: 'pos' },
+    'buy to close': { label: 'Cerrada anticipadamente', cls: '' },
+    'assigned': { label: 'Asignada ⚠️', cls: 'neg' },
+  };
+
+  for (const c of rows) {
+    const res = resultLabel[c.closeAction] || { label: c.closeAction, cls: '' };
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${c.ticker}</strong></td>
+      <td>${c.type === 'C' ? 'CALL' : 'PUT'} corta</td>
+      <td>$${c.strike.toFixed(2)}</td>
+      <td>${c.expiration}</td>
+      <td>${c.closeDate}</td>
+      <td>${c.qty}</td>
+      <td class="pos">${fmtMoney(c.premium)}</td>
+      <td class="${res.cls}">${res.label}</td>
+      <td class="${c.premium>=0?'pos':'neg'}">${fmtMoney(c.premium)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
 }
 
 function renderHistory() {
@@ -2477,8 +2622,8 @@ const KPI_INFO = {
   },
   'roi-capital': {
     title: 'Capital operacional (base)',
-    desc: 'Todo el capital que tienes comprometido HOY en la rueda: el costo bruto de las acciones que ya posees en tickers de la rueda, MÁS el capital que queda bloqueado como garantía en cada put vendido y aún abierto (cash-secured puts), sin importar el plazo de vencimiento. Por eso incluye también puts de largo plazo como TSLA o NVDA.',
-    formula: 'Σ(costo bruto de acciones en la rueda) + Σ(strike × contratos × 100) de cada PUT abierto'
+    desc: 'El capital real que tienes invertido HOY en la rueda: solo el costo bruto de las acciones que posees en tickers de la rueda. Los puts vendidos NO se incluyen porque usan el margen de la cuenta como garantía sin costo financiero para ti mientras no sean ejercidos — incluirlos distorsionaría la rentabilidad a la baja.',
+    formula: 'Σ(costo bruto de acciones en la rueda)\nNota: Puts abiertos excluidos del denominador (margen sin costo)'
   },
   'roi-premium': {
     title: 'Primas + Dividendos (período)',
@@ -2765,11 +2910,11 @@ function showRoiDetail(field) {
       </tr>`;
     }).join('');
     const putRows = d.puts.map(p => `
-      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);">
+      <tr style="border-bottom:1px solid rgba(71,85,105,0.4);opacity:0.55;">
         <td style="padding:5px 8px;font-weight:600;">${p.ticker}</td>
-        <td style="padding:5px 8px;">PUT $${p.strike} vto. ${p.expiration} (${p.contracts} contrato${p.contracts>1?'s':''})</td>
+        <td style="padding:5px 8px;">PUT $${p.strike} vto. ${p.expiration} (${p.contracts} contrato${p.contracts>1?'s':''}) <span style="font-size:0.68rem;color:var(--muted);">— margen sin costo, excluido</span></td>
         <td style="padding:5px 8px;text-align:right;">—</td>
-        <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmtMoney(p.capital)}</td>
+        <td style="padding:5px 8px;text-align:right;text-decoration:line-through;color:var(--muted);">${fmtMoney(p.capital)}</td>
       </tr>`).join('');
     const body = `
       <div style="max-height:380px;overflow-y:auto;">
