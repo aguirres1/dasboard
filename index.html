@@ -627,14 +627,27 @@
             <th>Ticker</th>
             <th>Acciones</th>
             <th>Costo Bruto</th>
-            <th>Costo Promedio</th>
             <th>Primas Netas</th>
             <th>Dividendos</th>
             <th style="color:#7c3aed;" title="Precio de equilibrio REAL: flujo neto total ÷ acciones actuales — incluye todas las vueltas de la rueda">Equilibrio Real ★</th>
             <th>Precio Actual</th>
-            <th>P&amp;L No Realizada</th>
-            <th>P&amp;L Realizada</th>
-            <th style="color:#7c3aed;" title="Operación recomendada por el scanner">🤖 Scanner</th>
+            <th title="Ganancia/pérdida no realizada usando precio de equilibrio real">P&amp;L No Realiz.</th>
+            <th title="Ganancia/pérdida realizada de ventas y asignaciones">P&amp;L Realiz.</th>
+            <th title="Primas + Dividendos + P&L Realizada + P&L No Realizada" style="color:var(--green);font-weight:700;">P&amp;L Total ★</th>
+            <th style="color:#7c3aed;" title="Operación recomendada por el scanner">🤖</th>
+          </tr>
+          <tr id="positions-totals" style="font-size:0.75rem;font-weight:700;background:var(--panel-2);border-top:2px solid var(--border);">
+            <td colspan="2" style="padding:6px 8px;color:var(--muted);">TOTALES (filas filtradas)</td>
+            <td id="tot-shares"  style="padding:6px 8px;text-align:right;"></td>
+            <td id="tot-costo"   style="padding:6px 8px;text-align:right;"></td>
+            <td id="tot-primas"  style="padding:6px 8px;text-align:right;"></td>
+            <td id="tot-div"     style="padding:6px 8px;text-align:right;"></td>
+            <td style="padding:6px 8px;">—</td>
+            <td style="padding:6px 8px;">—</td>
+            <td id="tot-unreal"  style="padding:6px 8px;text-align:right;"></td>
+            <td id="tot-real"    style="padding:6px 8px;text-align:right;"></td>
+            <td id="tot-total"   style="padding:6px 8px;text-align:right;font-size:0.9rem;"></td>
+            <td style="padding:6px 8px;">—</td>
           </tr>
         </thead>
         <tbody></tbody>
@@ -2111,50 +2124,111 @@ function renderPositions(tickers) {
       (showAll ? 'Sin posiciones registradas todavía.'
                : 'Aún no has operado opciones sobre ningún activo.');
   }
+
+  // Acumuladores para totales
+  let totShares = 0, totCosto = 0, totPrimas = 0, totDiv = 0;
+  let totUnreal = 0, totReal = 0, totTotal = 0;
+  let hasUnreal = false;
+
   for (const t of arr) {
-    const avgCost = t.shares>0 ? t.costGross/t.shares : 0;
-    const realBreakeven = calcBreakeven(t.ticker);
     const px = state.prices[t.ticker];
-    const unrealized = px && t.shares>0 && realBreakeven ? (px - realBreakeven) * t.shares : null;
+    const realBreakeven = calcBreakeven(t.ticker);
+    const unrealized = px && t.shares > 0 && realBreakeven
+      ? (px - realBreakeven) * t.shares : null;
+
+    // P&L Total = primas + dividendos + realizada + no realizada
+    const totalPL = t.premium + t.dividends + t.realizedPL + (unrealized ?? 0);
+
     const inWheel = isInWheel(t.ticker, t);
-    const isRec = isScriptRec(t.ticker);
+    const isRec   = isScriptRec(t.ticker);
+
+    // Acumular totales
+    totShares += t.shares;
+    totCosto  += t.costGross;
+    totPrimas += t.premium;
+    totDiv    += t.dividends;
+    totReal   += t.realizedPL;
+    totTotal  += totalPL;
+    if (unrealized !== null) { totUnreal += unrealized; hasUnreal = true; }
+
     const tr = document.createElement('tr');
     if (isRec) tr.style.borderLeft = '3px solid #7c3aed';
+
+    // Color del P&L Total
+    const totalColor = totalPL >= 0 ? 'var(--green)' : 'var(--red)';
+    // Color equilibrio: verde si precio actual > equilibrio, rojo si no
+    const eqColor = realBreakeven && px
+      ? (px >= realBreakeven ? 'var(--green)' : 'var(--red)') : 'var(--text)';
+
     tr.innerHTML = `
       <td style="text-align:center;">
-        <input type="checkbox" class="wheel-toggle" data-ticker="${t.ticker}" ${inWheel?'checked':''} title="Incluir/excluir de la rueda">
+        <input type="checkbox" class="wheel-toggle" data-ticker="${t.ticker}"
+          ${inWheel?'checked':''} title="Incluir/excluir de la rueda">
       </td>
       <td>
         <strong>${t.ticker}</strong>
-        ${isRec ? '<span title="Recomendación del scanner" style="font-size:0.65rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:6px;margin-left:4px;font-weight:600;">🤖</span>' : ''}
+        ${isRec ? '<span title="Recomendación del scanner" style="font-size:0.62rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:5px;margin-left:3px;font-weight:600;">🤖</span>' : ''}
       </td>
-      <td>${t.shares.toFixed(0)}</td>
-      <td>${fmtMoney(t.costGross)}</td>
-      <td>${avgCost ? fmtMoney(avgCost) : '—'}</td>
-      <td class="${t.premium>=0?'pos':'neg'}">${fmtMoney(t.premium)}</td>
-      <td class="${t.dividends>=0?'pos':'neg'}">${fmtMoney(t.dividends)}</td>
-      <td style="font-weight:600;color:${realBreakeven&&px&&px<realBreakeven?'var(--red)':'var(--green)'}">
+      <td style="text-align:right;">${Math.round(t.shares)}</td>
+      <td style="text-align:right;">${fmtMoney(t.costGross)}</td>
+      <td style="text-align:right;" class="${t.premium>=0?'pos':'neg'}">${fmtMoney(t.premium)}</td>
+      <td style="text-align:right;" class="${t.dividends>=0?'pos':'neg'}">${fmtMoney(t.dividends)}</td>
+      <td style="text-align:right;font-weight:600;color:${eqColor};">
         ${realBreakeven ? fmtMoney(realBreakeven) : '—'}
       </td>
-      <td>${px ? '$'+px.toFixed(2) : '<span class="muted">—</span>'}</td>
-      <td class="${(unrealized||0)>=0?'pos':'neg'}">${unrealized!==null ? fmtMoney(unrealized) : '—'}</td>
-      <td class="${t.realizedPL>=0?'pos':'neg'}">${fmtMoney(t.realizedPL)}</td>
+      <td style="text-align:right;">${px ? '$'+px.toFixed(2) : '<span class="muted">—</span>'}</td>
+      <td style="text-align:right;" class="${(unrealized??0)>=0?'pos':'neg'}">
+        ${unrealized !== null ? fmtMoney(unrealized) : '—'}
+      </td>
+      <td style="text-align:right;" class="${t.realizedPL>=0?'pos':'neg'}">${fmtMoney(t.realizedPL)}</td>
+      <td style="text-align:right;font-weight:700;color:${totalColor};font-size:0.95rem;">${fmtMoney(totalPL)}</td>
       <td style="text-align:center;">
         <button onclick="toggleScriptRec('${t.ticker}')"
-          style="font-size:0.65rem;padding:2px 6px;border-radius:6px;cursor:pointer;
+          style="font-size:0.62rem;padding:2px 5px;border-radius:5px;cursor:pointer;
             background:${isRec?'rgba(124,58,237,0.15)':'var(--panel-2)'};
             border:1px solid ${isRec?'#7c3aed':'var(--border)'};
             color:${isRec?'#7c3aed':'var(--muted)'};">
-          ${isRec ? '🤖 Quitar' : '+ Scanner'}
+          ${isRec ? '✓' : '+'}
         </button>
       </td>
     `;
     tbody.appendChild(tr);
   }
+
+  // Actualizar fila de totales
+  const setTot = (id, val, isAmount=true) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (isAmount) {
+      el.textContent = fmtMoney(val);
+      el.className = val >= 0 ? 'pos' : 'neg';
+      el.style.textAlign = 'right';
+    } else {
+      el.textContent = val;
+      el.style.textAlign = 'right';
+    }
+  };
+  setTot('tot-shares', Math.round(totShares), false);
+  setTot('tot-costo',  totCosto);
+  setTot('tot-primas', totPrimas);
+  setTot('tot-div',    totDiv);
+  setTot('tot-unreal', hasUnreal ? totUnreal : 0);
+  setTot('tot-real',   totReal);
+  const totEl = document.getElementById('tot-total');
+  if (totEl) {
+    totEl.textContent = fmtMoney(totTotal);
+    totEl.style.color = totTotal >= 0 ? 'var(--green)' : 'var(--red)';
+    totEl.style.textAlign = 'right';
+    totEl.style.fontSize = '1rem';
+  }
+
   tbody.querySelectorAll('.wheel-toggle').forEach(cb => {
     cb.addEventListener('change', () => toggleWheelTicker(cb.dataset.ticker, cb.checked));
   });
 }
+
+let __expiredFilterDays = 7;
+
 function setExpiredFilter(days) {
   __expiredFilterDays = days;
   document.querySelectorAll('.expired-filter-btn').forEach(b => {
