@@ -472,6 +472,14 @@
   <section class="panel">
     <h2>🔄 La Rueda — Estado por Ticker</h2>
     <div class="muted" style="margin-bottom:0.8rem; font-size:0.8rem;">Visualiza en qué fase de la rueda se encuentra cada activo: venta de put → asignación → covered call → ciclo.</div>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;color:var(--muted);">
+        <input type="checkbox" id="wheel-filter-scanner" onchange="recompute()"
+          style="accent-color:#7c3aed;width:14px;height:14px;">
+        <span>🤖 Solo recomendaciones del scanner</span>
+      </label>
+      <span id="wheel-rec-count" style="font-size:0.75rem;color:#7c3aed;font-weight:600;"></span>
+    </div>
     <div class="wheel-grid" id="wheel-grid"></div>
     <div class="empty" id="wheel-empty">Sin posiciones activas en la rueda. Carga un CSV o registra una operación manual.</div>
   </section>
@@ -601,6 +609,11 @@
     <h2>Resumen por Activo (Costo Real de Adquisición)</h2>
     <div class="muted" style="margin-bottom:0.6rem; display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
       <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+        <input type="checkbox" id="positions-filter-scanner" onchange="recompute()"
+          style="accent-color:#7c3aed;">
+        <span style="color:#7c3aed;font-weight:600;">🤖 Solo recomendaciones del scanner</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
         <input type="checkbox" id="positions-show-all">
         <span>Mostrar todas las posiciones (incluir acciones sin opciones operadas)</span>
       </label>
@@ -617,11 +630,11 @@
             <th>Costo Promedio</th>
             <th>Primas Netas</th>
             <th>Dividendos</th>
-            <th>Costo Real Ajustado</th>
-            <th>Costo Real /acción</th>
+            <th style="color:#7c3aed;" title="Precio de equilibrio REAL: flujo neto total ÷ acciones actuales — incluye todas las vueltas de la rueda">Equilibrio Real ★</th>
             <th>Precio Actual</th>
             <th>P&amp;L No Realizada</th>
             <th>P&amp;L Realizada</th>
+            <th style="color:#7c3aed;" title="Operación recomendada por el scanner">🤖 Scanner</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -677,7 +690,10 @@ let state = {
   transactions: [],   // raw rows
   prices: {},         // ticker -> price
   pricesTime: null,
+  scriptRecs: {},     // { 'TICKER|date|symbol': true } — operaciones marcadas como recomendación del scanner
 };
+
+const SCRIPT_RECS_KEY = 'cc_dashboard_scriptrecs_v1';
 
 function loadState() {
   try {
@@ -686,6 +702,8 @@ function loadState() {
     const p = localStorage.getItem(PRICES_KEY);
     if (p) state.prices = JSON.parse(p);
     state.pricesTime = localStorage.getItem(PRICES_TIME_KEY);
+    const sr = localStorage.getItem(SCRIPT_RECS_KEY);
+    if (sr) state.scriptRecs = JSON.parse(sr);
   } catch(e) { console.error(e); }
 }
 
@@ -693,6 +711,7 @@ function saveState(syncToSheets = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.transactions));
   localStorage.setItem(PRICES_KEY,  JSON.stringify(state.prices));
   if (state.pricesTime) localStorage.setItem(PRICES_TIME_KEY, state.pricesTime);
+  localStorage.setItem(SCRIPT_RECS_KEY, JSON.stringify(state.scriptRecs));
   if (syncToSheets) scheduleSheetsSync();
 }
 
@@ -1116,13 +1135,90 @@ function recompute() {
 }
 
 // ----- Wheel Tracker + Detail Modal -----
+
+
+// ── Script Rec Helpers ─────────────────────────────────────────
+// Clave única por ticker (a nivel de posición completa, no por transacción)
+function scriptRecKey(ticker) {
+  return `rec|${ticker}`;
+}
+
+function isScriptRec(ticker) {
+  return !!state.scriptRecs[scriptRecKey(ticker)];
+}
+
+function toggleScriptRec(ticker) {
+  const key = scriptRecKey(ticker);
+  if (state.scriptRecs[key]) {
+    delete state.scriptRecs[key];
+  } else {
+    state.scriptRecs[key] = { date: new Date().toISOString().slice(0,10) };
+  }
+  saveState(false);
+  recompute();
+}
+
+// ── Precio de equilibrio REAL ──────────────────────────────────
+// Suma todos los flujos de efectivo: compras, ventas, primas, rolls
+// El precio de equilibrio = dinero neto gastado / acciones actuales
+// Cuando una vuelta completa (compra→venta) cristaliza, su resultado
+// queda en el flujo acumulado y no "contamina" la siguiente vuelta.
+function calcBreakeven(ticker) {
+  const txs = filteredTransactions().filter(tx => {
+    const opt = classifyOption(tx.symbol);
+    if (opt) return opt.underlying === ticker;
+    return (tx.symbol || '').trim() === ticker;
+  });
+
+  let cashFlow = 0; // positivo = entra dinero, negativo = sale dinero
+  let shares = 0;
+
+  for (const tx of txs) {
+    const action = (tx.action || '').trim().toLowerCase();
+    const amount = tx.amount || 0;
+    const qty    = Math.abs(tx.quantity || 0);
+    const opt    = classifyOption(tx.symbol);
+
+    if (opt) {
+      // Opciones: STO entra dinero (+), BTC sale dinero (-), Expired/Assigned = 0 cash
+      if (action === 'sell to open')  cashFlow += amount;  // positivo
+      if (action === 'buy to close')  cashFlow += amount;  // negativo
+    } else {
+      // Acciones: Buy sale dinero (-), Sell entra dinero (+)
+      if (action === 'buy' || action === 'reinvest shares') {
+        cashFlow -= Math.abs(amount);
+        shares   += qty;
+      } else if (action === 'sell') {
+        cashFlow += Math.abs(amount);
+        shares   -= qty;
+      }
+    }
+  }
+
+  if (shares < 1) return null;
+  // cashFlow es negativo (gastamos más de lo que entró)
+  // breakeven = cuánto necesitamos por acción para recuperar el capital neto
+  return -cashFlow / shares;
+}
+
 function renderWheel(tickers) {
   const grid = document.getElementById('wheel-grid');
   const empty = document.getElementById('wheel-empty');
   if (!grid) return;
   grid.innerHTML = '';
-  const arr = Object.values(tickers).filter(t => isInWheel(t.ticker, t));
+
+  // Filtro de scanner
+  const filterEl = document.getElementById('wheel-filter-scanner');
+  const onlyScanner = filterEl && filterEl.checked;
+
+  let arr = Object.values(tickers).filter(t => isInWheel(t.ticker, t));
+  if (onlyScanner) arr = arr.filter(t => isScriptRec(t.ticker));
   empty.style.display = arr.length ? 'none' : 'block';
+
+  // Actualizar contador de recomendaciones
+  const recCount = Object.values(tickers).filter(t => isInWheel(t.ticker, t) && isScriptRec(t.ticker)).length;
+  const recCountEl = document.getElementById('wheel-rec-count');
+  if (recCountEl) recCountEl.textContent = recCount > 0 ? `${recCount} posición${recCount>1?'es':''} del scanner` : '';
 
   for (const t of arr) {
     const px = state.prices[t.ticker];
@@ -1148,7 +1244,9 @@ function renderWheel(tickers) {
     const dividends     = t.dividends;
     const realizedPL    = t.realizedPL;    // ganancia/pérdida de acciones ya vendidas o asignadas
     const avgCost       = hasShares ? t.costGross / t.shares : null;
-    const realCost       = hasShares ? (t.costGross - t.premium - t.dividends) / t.shares : null;
+    // Precio de equilibrio REAL: suma todos los flujos (compras, ventas, primas, rolls)
+    // dividido entre acciones actuales — no mezcla primas de vueltas anteriores
+    const realCost      = calcBreakeven(t.ticker);
     // P&L no realizada en acciones que aún tienes: (precio actual - costo real ajustado) x acciones
     const unrealizedStock = px && hasShares ? (px - (realCost ?? avgCost ?? 0)) * displayShares : null;
 
@@ -1167,11 +1265,13 @@ function renderWheel(tickers) {
     card.title = 'Clic para ver detalle de operaciones';
     card.dataset.ticker = t.ticker;
 
+    const isRec = isScriptRec(t.ticker);
     card.innerHTML = `
       <h3>
         <span style="font-size:1.1rem;">🎡</span>
         <strong>${t.ticker}</strong>
         ${px ? `<span style="color:var(--muted);font-size:0.8rem;font-weight:400;">$${px.toFixed(2)}</span>` : ''}
+        ${isRec ? `<span title="Recomendación del scanner" style="font-size:0.7rem;background:#7c3aed;color:#fff;padding:1px 6px;border-radius:8px;font-weight:600;">🤖 Scanner</span>` : ''}
         <span style="margin-left:auto;font-size:0.7rem;color:var(--muted);font-weight:400;">Ver detalle →</span>
       </h3>
       <div class="wheel-steps">
@@ -1219,9 +1319,31 @@ function renderWheel(tickers) {
     `;
 
     card.addEventListener('click', (e) => {
+      // Si hizo click en el botón de scanner, no abrir detalle
+      if (e.target.closest('.btn-script-rec')) return;
       const field = e.target.closest('[data-field]')?.dataset.field || null;
       showWheelDetail(t, field);
     });
+
+    // Botón de tag scanner — fuera del innerHTML para evitar issues con template literals anidados
+    const recBtn = document.createElement('button');
+    recBtn.className = 'btn-script-rec';
+    recBtn.style.cssText = `
+      width:100%;margin-top:0.6rem;padding:0.35rem 0.8rem;
+      background:${isRec ? 'rgba(124,58,237,0.15)' : 'var(--panel-2)'};
+      border:1px solid ${isRec ? '#7c3aed' : 'var(--border)'};
+      color:${isRec ? '#7c3aed' : 'var(--muted)'};
+      border-radius:6px;font-size:0.75rem;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;gap:0.4rem;
+    `;
+    recBtn.innerHTML = isRec
+      ? '🤖 Recomendado por scanner — clic para quitar tag'
+      : '○ Marcar como recomendación del scanner';
+    recBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleScriptRec(t.ticker);
+    });
+    card.appendChild(recBtn);
 
     grid.appendChild(card);
   }
@@ -1238,7 +1360,8 @@ function showWheelDetail(t, highlightField) {
   const px = state.prices[t.ticker];
   const hasShares = t.shares > 0;
   const avgCost  = hasShares ? t.costGross / t.shares : null;
-  const realCost = hasShares ? (t.costGross - t.premium - t.dividends) / t.shares : null;
+  // Precio de equilibrio REAL — considera todos los flujos históricos
+  const realCost = calcBreakeven(t.ticker);
   const unrealized = px && hasShares ? (px - (realCost ?? avgCost ?? 0)) * t.shares : null;
 
   // Group by category for the summary breakdown
@@ -1296,15 +1419,37 @@ function showWheelDetail(t, highlightField) {
       </div>`;
   }
 
+  // Calcular flujo neto para mostrar en el desglose
+  const beTxs = filteredTransactions().filter(tx => {
+    const opt = classifyOption(tx.symbol);
+    if (opt) return opt.underlying === t.ticker;
+    return (tx.symbol||'').trim() === t.ticker;
+  });
+  let beCashFlow = 0;
+  for (const tx of beTxs) {
+    const action = (tx.action||'').toLowerCase();
+    const amount = tx.amount || 0;
+    const qty = Math.abs(tx.quantity||0);
+    const opt = classifyOption(tx.symbol);
+    if (opt) {
+      if (action==='sell to open'||action==='buy to close') beCashFlow += amount;
+    } else {
+      if (action==='buy'||action==='reinvest shares') beCashFlow -= Math.abs(amount);
+      else if (action==='sell') beCashFlow += Math.abs(amount);
+    }
+  }
+  const sharesNow = Math.round(t.shares);
+
   const summaryRows = [
-    { label: 'Costo bruto acciones',   val: t.costGross,               note: '' },
-    { label: '− Primas netas cobradas',val: -t.premium,                note: '' },
-    { label: '− Dividendos',           val: -t.dividends,              note: '' },
-    { label: '= Costo real ajustado',  val: t.costGross - t.premium - t.dividends, note: '', bold: true },
-    { label: 'Acciones en cartera',    val: null, txt: t.shares > 0 ? t.shares.toFixed(0) : '0', note: '' },
-    { label: 'Costo real / acción',    val: null, txt: realCost !== null ? fmtMoney(realCost) : '—', note: '', bold: true },
+    { label: 'Flujo neto acumulado (todos los flujos)',   val: beCashFlow, note: '' },
+    { label: '  Acciones actuales',    val: null, txt: sharesNow > 0 ? sharesNow.toFixed(0) : '0', note: '' },
+    { label: 'Precio equilibrio REAL (flujo ÷ acciones)',  val: null, txt: realCost !== null ? fmtMoney(realCost)+'/acc' : '—', note: '', bold: true },
+    { label: '  → Precio al que necesitas vender/asignar para no perder', val: null, txt: realCost !== null ? fmtMoney(realCost) : '—', note: '' },
     { label: 'Precio actual',          val: null, txt: px ? '$'+px.toFixed(2) : '—', note: '' },
     { label: 'P&L no realizada',       val: unrealized, note: '', bold: true },
+    { label: '────────────────────', val: null, txt: '', note: '' },
+    { label: 'Primas netas (ref.)',    val: t.premium, note: '' },
+    { label: 'P&L Realizada (ref.)',   val: t.realizedPL, note: '' },
   ];
 
   const summaryHTML = summaryRows.map(r => {
@@ -1948,41 +2093,61 @@ function renderPositions(tickers) {
   const tbody = document.querySelector('#positions-table tbody');
   tbody.innerHTML = '';
   const showAll = document.getElementById('positions-show-all') && document.getElementById('positions-show-all').checked;
+  const onlyScanner = document.getElementById('positions-filter-scanner') && document.getElementById('positions-filter-scanner').checked;
+
   let arr = Object.values(tickers);
   if (!showAll) {
     arr = arr.filter(t => isInWheel(t.ticker, t));
   } else {
     arr = arr.filter(t => t.shares>0 || t.realizedPL!==0 || t.premium!==0 || t.dividends!==0);
   }
+  if (onlyScanner) arr = arr.filter(t => isScriptRec(t.ticker));
   arr.sort((a,b)=> a.ticker.localeCompare(b.ticker));
+
   const empty = document.getElementById('positions-empty');
   if (empty) {
     empty.style.display = arr.length ? 'none' : 'block';
     empty.textContent = arr.length ? '' :
       (showAll ? 'Sin posiciones registradas todavía.'
-               : 'Aún no has operado opciones sobre ningún activo. Marca “Mostrar todas las posiciones” si quieres ver también las acciones sin opciones.');
+               : 'Aún no has operado opciones sobre ningún activo.');
   }
   for (const t of arr) {
     const avgCost = t.shares>0 ? t.costGross/t.shares : 0;
-    const adjustedCost = t.costGross - t.premium - t.dividends;
-    const adjustedPerShare = t.shares>0 ? adjustedCost/t.shares : null;
+    const realBreakeven = calcBreakeven(t.ticker);
     const px = state.prices[t.ticker];
-    const unrealized = px && t.shares>0 ? (px - (adjustedPerShare||avgCost))*t.shares : null;
+    const unrealized = px && t.shares>0 && realBreakeven ? (px - realBreakeven) * t.shares : null;
     const inWheel = isInWheel(t.ticker, t);
+    const isRec = isScriptRec(t.ticker);
     const tr = document.createElement('tr');
+    if (isRec) tr.style.borderLeft = '3px solid #7c3aed';
     tr.innerHTML = `
-      <td style="text-align:center;"><input type="checkbox" class="wheel-toggle" data-ticker="${t.ticker}" ${inWheel?'checked':''} title="Incluir/excluir ${t.ticker} de los cálculos de la rueda"></td>
-      <td><strong>${t.ticker}</strong></td>
+      <td style="text-align:center;">
+        <input type="checkbox" class="wheel-toggle" data-ticker="${t.ticker}" ${inWheel?'checked':''} title="Incluir/excluir de la rueda">
+      </td>
+      <td>
+        <strong>${t.ticker}</strong>
+        ${isRec ? '<span title="Recomendación del scanner" style="font-size:0.65rem;background:#7c3aed;color:#fff;padding:1px 5px;border-radius:6px;margin-left:4px;font-weight:600;">🤖</span>' : ''}
+      </td>
       <td>${t.shares.toFixed(0)}</td>
       <td>${fmtMoney(t.costGross)}</td>
       <td>${avgCost ? fmtMoney(avgCost) : '—'}</td>
       <td class="${t.premium>=0?'pos':'neg'}">${fmtMoney(t.premium)}</td>
       <td class="${t.dividends>=0?'pos':'neg'}">${fmtMoney(t.dividends)}</td>
-      <td>${fmtMoney(adjustedCost)}</td>
-      <td>${adjustedPerShare ? fmtMoney(adjustedPerShare) : '—'}</td>
+      <td style="font-weight:600;color:${realBreakeven&&px&&px<realBreakeven?'var(--red)':'var(--green)'}">
+        ${realBreakeven ? fmtMoney(realBreakeven) : '—'}
+      </td>
       <td>${px ? '$'+px.toFixed(2) : '<span class="muted">—</span>'}</td>
-      <td class="${unrealized>=0?'pos':'neg'}">${unrealized!==null ? fmtMoney(unrealized) : '—'}</td>
+      <td class="${(unrealized||0)>=0?'pos':'neg'}">${unrealized!==null ? fmtMoney(unrealized) : '—'}</td>
       <td class="${t.realizedPL>=0?'pos':'neg'}">${fmtMoney(t.realizedPL)}</td>
+      <td style="text-align:center;">
+        <button onclick="toggleScriptRec('${t.ticker}')"
+          style="font-size:0.65rem;padding:2px 6px;border-radius:6px;cursor:pointer;
+            background:${isRec?'rgba(124,58,237,0.15)':'var(--panel-2)'};
+            border:1px solid ${isRec?'#7c3aed':'var(--border)'};
+            color:${isRec?'#7c3aed':'var(--muted)'};">
+          ${isRec ? '🤖 Quitar' : '+ Scanner'}
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   }
@@ -1990,9 +2155,6 @@ function renderPositions(tickers) {
     cb.addEventListener('change', () => toggleWheelTicker(cb.dataset.ticker, cb.checked));
   });
 }
-
-let __expiredFilterDays = 7;
-
 function setExpiredFilter(days) {
   __expiredFilterDays = days;
   document.querySelectorAll('.expired-filter-btn').forEach(b => {
